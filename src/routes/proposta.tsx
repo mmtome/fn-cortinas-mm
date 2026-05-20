@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Download, FileText } from "lucide-react";
+import { Download } from "lucide-react";
 import jsPDF from "jspdf";
 import { AppShell } from "@/components/AppShell";
-import { PageHeader, Card, GoldButton } from "@/components/ui-kit";
+import { PageHeader, Card, GoldButton, formatDate } from "@/components/ui-kit";
 import { useStore } from "@/lib/store";
 import { formatBRL } from "@/lib/pricing";
 
@@ -12,14 +12,20 @@ export const Route = createFileRoute("/proposta")({
   validateSearch: (s: Record<string, unknown>) => ({ id: (s.id as string) ?? "" }),
 });
 
+function addDaysISO(iso: string, days: number) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
 function Proposta() {
   const { id } = Route.useSearch();
   const proposals = useStore((s) => s.proposals);
   const [selectedId, setSelectedId] = useState(id || proposals[0]?.id || "");
   const proposal = useMemo(() => proposals.find((p) => p.id === selectedId), [proposals, selectedId]);
 
-  const validade = new Date();
-  validade.setDate(validade.getDate() + 15);
+  const validadeISO = proposal ? addDaysISO(proposal.data, 15) : "";
 
   const baixarPDF = () => {
     if (!proposal) return;
@@ -165,98 +171,88 @@ function Proposta() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Proposta Comercial"
+        eyebrow="Proposta"
         title="Gerador de PDF"
-        subtitle="Apresente um documento sofisticado, à altura do seu cliente. Selecione uma precificação para gerar."
+        subtitle="Selecione uma precificação e gere uma proposta minimalista, pronta para o cliente."
         actions={
           <GoldButton onClick={baixarPDF}>
-            <Download className="w-4 h-4" /> Baixar PDF
+            <Download className="w-3.5 h-3.5" /> Baixar PDF
           </GoldButton>
         }
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
-        <Card>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-gold mb-3">Selecione</div>
-          <div className="space-y-2 max-h-[600px] overflow-y-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground mb-3">Selecione</div>
+          <div className="space-y-1 max-h-[600px] overflow-y-auto pr-1">
             {proposals.map((p) => (
               <button
                 key={p.id}
                 onClick={() => setSelectedId(p.id)}
-                className={`w-full text-left p-3 rounded-lg transition-all ${
+                className={`w-full text-left px-3 py-3 rounded-md transition-colors ${
                   selectedId === p.id
-                    ? "bg-[oklch(0.78_0.13_85_/_0.12)] border border-gold"
-                    : "border border-transparent hover:bg-[oklch(0.78_0.13_85_/_0.05)]"
+                    ? "bg-white/[0.05]"
+                    : "hover:bg-white/[0.025]"
                 }`}
               >
-                <div className="font-medium text-sm">{p.cliente}</div>
-                <div className="text-xs text-muted-foreground">{p.ambiente}</div>
-                <div className="text-xs text-gold mt-1">{formatBRL(p.valor)}</div>
+                <div className="text-[13px] font-medium">{p.cliente}</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">{p.ambiente}</div>
+                <div className="text-[12px] text-gold mt-1 stat">{formatBRL(p.valor)}</div>
               </button>
             ))}
           </div>
-        </Card>
+        </div>
 
-        {/* Preview */}
         {proposal ? (
-          <div className="rounded-2xl overflow-hidden shadow-premium">
+          <div className="rounded-xl overflow-hidden border border-white/[0.05]">
             {/* Capa preview */}
-            <div className="gradient-navy p-12 relative">
-              <div className="absolute top-0 left-0 right-0 h-1 gradient-gold" />
-              <div className="absolute bottom-0 left-0 right-0 h-1 gradient-gold" />
-              <div className="text-center">
-                <div className="text-[10px] uppercase tracking-[0.3em] text-gold mb-4">Atelier Premium</div>
-                <h2 className="font-serif text-5xl mb-3">FN Cortinas</h2>
-                <div className="w-24 h-px bg-gold mx-auto mb-4" />
-                <div className="text-lg font-serif">Proposta Comercial</div>
-                <div className="mt-8 text-sm text-muted-foreground space-y-1">
-                  <div>Cliente: <span className="text-foreground">{proposal.cliente}</span></div>
-                  <div>Ambiente: <span className="text-foreground">{proposal.ambiente}</span></div>
-                  <div>Data: <span className="text-foreground">{new Date(proposal.data).toLocaleDateString("pt-BR")}</span></div>
-                </div>
-                <div className="mt-10 text-[10px] uppercase tracking-[0.25em] text-gold">
-                  Cortinas · Persianas · Alto Padrão
-                </div>
+            <div className="bg-[var(--navy-deep)] px-12 py-16 text-center">
+              <div className="text-[10px] uppercase tracking-[0.25em] text-gold mb-6">Atelier Premium</div>
+              <div className="text-[28px] font-medium tracking-tight">FN Cortinas</div>
+              <div className="w-12 h-px bg-[oklch(0.80_0.10_88_/_0.5)] mx-auto my-5" />
+              <div className="text-[13px] text-muted-foreground">Proposta Comercial</div>
+              <div className="mt-12 text-[12px] text-muted-foreground space-y-1.5">
+                <div>{proposal.cliente}</div>
+                <div>{proposal.ambiente}</div>
+                <div>{formatDate(proposal.data)}</div>
               </div>
             </div>
 
             {/* Detalhe preview */}
-            <div className="bg-[var(--champagne)] text-[var(--navy-deep)] p-10">
-              <div className="flex items-center gap-3 mb-6">
-                <FileText className="w-5 h-5 text-[var(--navy-deep)]" />
-                <h3 className="font-serif text-2xl">Detalhamento</h3>
-              </div>
+            <div className="bg-[var(--champagne)] text-[var(--navy-deep)] px-12 py-12">
+              <div className="text-[10px] uppercase tracking-[0.18em] opacity-60 mb-2">Detalhamento</div>
+              <div className="text-[18px] font-medium tracking-tight mb-8">Proposta {proposal.cliente.split(" ")[0]}</div>
 
-              <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-2 gap-8 mb-8 text-[13px]">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.2em] opacity-60">Cliente</div>
-                  <div className="font-medium">{proposal.cliente}</div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] opacity-50 mb-1.5">Cliente</div>
+                  <div>{proposal.cliente}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.2em] opacity-60">Ambiente</div>
-                  <div className="font-medium">{proposal.ambiente}</div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] opacity-50 mb-1.5">Ambiente</div>
+                  <div>{proposal.ambiente}</div>
                 </div>
               </div>
 
-              <div className="h-px bg-[oklch(0.78_0.13_85)] mb-6" />
+              <div className="h-px bg-[var(--navy-deep)] opacity-10 mb-8" />
 
-              <div className="text-[10px] uppercase tracking-[0.2em] opacity-60 mb-3">Descrição técnica</div>
-              <ul className="text-sm space-y-1 opacity-80 mb-6">
-                <li>• Tecido: {proposal.config?.tecido ?? "Linho Belga"}</li>
-                <li>• Tipo: {proposal.config?.tipoCortina ?? "Wave"}</li>
-                <li>• Trilho: {proposal.config?.trilho ?? "Trilho Suíço"}</li>
-                <li>• Instalação e acabamento premium inclusos</li>
+              <div className="text-[10px] uppercase tracking-[0.18em] opacity-50 mb-3">Descrição técnica</div>
+              <ul className="text-[13px] space-y-1.5 opacity-80 mb-10">
+                <li>Tecido · {proposal.config?.tecido ?? "Linho Belga"}</li>
+                <li>Tipo · {proposal.config?.tipoCortina ?? "Wave"}</li>
+                <li>Trilho · {proposal.config?.trilho ?? "Trilho Suíço"}</li>
+                <li>Instalação e acabamento premium inclusos</li>
               </ul>
 
-              <div className="bg-[var(--navy-deep)] text-[var(--champagne)] rounded-lg p-6 border-l-4 border-[var(--gold)]">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-gold">Total</div>
-                <div className="font-serif text-4xl">{formatBRL(proposal.valor)}</div>
+              <div className="flex items-baseline justify-between pt-6 border-t border-[var(--navy-deep)]/15">
+                <div className="text-[10px] uppercase tracking-[0.18em] opacity-50">Total</div>
+                <div className="text-[26px] font-medium tracking-tight stat">{formatBRL(proposal.valor)}</div>
               </div>
 
-              <div className="mt-6 text-xs space-y-1 opacity-70">
-                <div>Validade: {validade.toLocaleDateString("pt-BR")}</div>
-                <div>Pagamento: 50% sinal + 50% na entrega · Produção: 15 a 25 dias úteis</div>
-                <div>Garantia de 12 meses</div>
+              <div className="mt-10 text-[11px] space-y-1 opacity-60">
+                <div>Validade · {formatDate(validadeISO)}</div>
+                <div>Pagamento · 50% sinal + 50% na entrega</div>
+                <div>Produção · 15 a 25 dias úteis · Garantia 12 meses</div>
               </div>
             </div>
           </div>
