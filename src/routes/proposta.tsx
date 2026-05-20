@@ -156,7 +156,7 @@ function Proposta() {
     y += 14;
     doc.text("• Pagamento: 50% sinal e 50% na entrega", 50, y); y += 12;
     doc.text("• Prazo de produção: 15 a 25 dias úteis", 50, y); y += 12;
-    doc.text(`• Validade da proposta: ${validade.toLocaleDateString("pt-BR")}`, 50, y); y += 12;
+    doc.text(`• Validade da proposta: ${formatDate(validadeISO)}`, 50, y); y += 12;
     doc.text("• Garantia: 12 meses para tecidos e mecanismos", 50, y); y += 30;
 
     doc.setDrawColor(212, 175, 55);
