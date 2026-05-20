@@ -307,27 +307,27 @@ function StepEstrutura({ input, set, alertaTecido, alertaForro, estoqueTecido, e
       <StepTitle eyebrow="Etapa 3 · Estrutura" title="Defina cortina, tecidos e acabamentos" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8">
         <Field label="Modelo">
-          <select className={inputCls} value={e.modelo} onChange={(ev) => set("estrutura", { modelo: ev.target.value })}>
+          <select className={selectCls} value={e.modelo} onChange={(ev) => set("estrutura", { modelo: ev.target.value })}>
             {MODELOS.map((m) => <option key={m}>{m}</option>)}
           </select>
         </Field>
         <Toggle label="Motorizada" hint="Acionamento elétrico" v={e.motorizada} set={(v) => set("estrutura", { motorizada: v })} />
 
         <Field label="Tecido principal" hint={alertaTecido ? `Estoque insuficiente · ${estoqueTecido}m disponíveis` : estoqueTecido != null ? `${estoqueTecido}m em estoque` : undefined}>
-          <select className={`${inputCls} ${alertaTecido ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={e.tecidoCodigo} onChange={(ev) => set("estrutura", { tecidoCodigo: +ev.target.value })}>
+          <select className={`${selectCls} ${alertaTecido ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={e.tecidoCodigo} onChange={(ev) => set("estrutura", { tecidoCodigo: +ev.target.value })}>
             {CATALOGO_TECIDOS.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
           </select>
         </Field>
 
         <Field label="Forro" hint={e.forroCodigo == null ? "Sem forro" : alertaForro ? `Estoque insuficiente · ${estoqueForro}m` : estoqueForro != null ? `${estoqueForro}m em estoque` : undefined}>
-          <select className={`${inputCls} ${alertaForro ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={e.forroCodigo ?? "none"} onChange={(ev) => set("estrutura", { forroCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
+          <select className={`${selectCls} ${alertaForro ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={e.forroCodigo ?? "none"} onChange={(ev) => set("estrutura", { forroCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
             <option value="none">Sem forro</option>
             {CATALOGO_FORROS.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
           </select>
         </Field>
 
         <Field label="Blackout" hint={e.blackoutCodigo == null ? "Sem blackout" : "Trilho duplo inferido"}>
-          <select className={inputCls} value={e.blackoutCodigo ?? "none"} onChange={(ev) => set("estrutura", { blackoutCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
+          <select className={selectCls} value={e.blackoutCodigo ?? "none"} onChange={(ev) => set("estrutura", { blackoutCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
             <option value="none">Sem blackout</option>
             {CATALOGO_BLACKOUTS.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
           </select>
@@ -371,7 +371,7 @@ function StepComposicao({ input, set, result }: any) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
           <Toggle label="Instalar no local" hint="Inclui colocação" v={i.instalar} set={(v) => set("instalacao", { instalar: v })} />
           <Field label="Dificuldade">
-            <select className={inputCls} value={i.dificuldade} onChange={(e) => set("instalacao", { dificuldade: e.target.value })}>
+            <select className={selectCls} value={i.dificuldade} onChange={(e) => set("instalacao", { dificuldade: e.target.value })}>
               <option>Padrão</option>
               <option>Difícil</option>
             </select>
@@ -393,7 +393,7 @@ function StepComercial({ input, set, result }: any) {
       <StepTitle eyebrow="Etapa 5 · Comercial" title="Condições de pagamento" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8">
         <Field label="Forma de pagamento">
-          <select className={inputCls} value={c.forma} onChange={(e) => set("comercial", { forma: e.target.value })}>
+          <select className={selectCls} value={c.forma} onChange={(e) => set("comercial", { forma: e.target.value })}>
             {FORMAS.map((f) => <option key={f}>{f}</option>)}
           </select>
         </Field>
