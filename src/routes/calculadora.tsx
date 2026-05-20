@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Save, ArrowRight, ArrowLeft, Check, Ruler, User2, Layers, Wrench, Wallet, AlertTriangle, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { PageHeader, GoldButton, Field, inputCls } from "@/components/ui-kit";
+import { PageHeader, GoldButton, Field, inputCls, selectCls } from "@/components/ui-kit";
 import {
   calcular,
   defaultPricingInput,
@@ -26,7 +26,26 @@ const STEPS = [
   { key: "comercial",   label: "Comercial",   icon: Wallet },
 ] as const;
 
-const AMBIENTES = ["Sala", "Sala de Jantar", "Suíte Master", "Quarto", "Home Office", "Cozinha", "Sacada", "Showroom"];
+const AMBIENTES = [
+  "Sala de Estar",
+  "Sala de Jantar",
+  "Suíte Master",
+  "Suíte de Hóspedes",
+  "Closet",
+  "Home Theater",
+  "Home Office",
+  "Biblioteca",
+  "Lavabo",
+  "Cozinha Gourmet",
+  "Sala de Estar do Pavimento Superior",
+  "Varanda Gourmet",
+  "Sacada Panorâmica",
+  "Adega Climatizada",
+  "Spa & Sauna",
+  "Quadra / Salão de Jogos",
+  "Hall de Entrada",
+  "Showroom",
+];
 const MODELOS = ["Wave", "Prega macho", "Prega americana", "Persiana"] as const;
 const FORMAS = ["Pix", "Cartão Débito", "Cartão Crédito 1x", "Cartão Crédito Parcelado", "Dinheiro"] as const;
 
@@ -158,6 +177,10 @@ function Stepper({ step, onPick }: { step: number; onPick: (i: number) => void }
 // STEP 1 — Cliente e Ambiente
 // =========================================================
 function StepCliente({ input, set }: any) {
+  const isPreset = AMBIENTES.includes(input.ambiente.ambiente);
+  const isOther = !isPreset && input.ambiente.ambiente !== "";
+  const [otherMode, setOtherMode] = useState(isOther);
+
   return (
     <div>
       <StepTitle eyebrow="Etapa 1 · Cliente" title="Para quem é este orçamento?" />
@@ -165,11 +188,44 @@ function StepCliente({ input, set }: any) {
         <Field label="Nome do cliente">
           <input className={inputCls} value={input.ambiente.cliente} onChange={(e) => set("ambiente", { cliente: e.target.value })} placeholder="Ex: Marina Albuquerque" />
         </Field>
-        <Field label="Ambiente">
-          <select className={inputCls} value={input.ambiente.ambiente} onChange={(e) => set("ambiente", { ambiente: e.target.value })}>
-            {AMBIENTES.map((a) => <option key={a}>{a}</option>)}
-          </select>
+
+        <Field label="Ambiente" hint="Selecione um ambiente ou descreva um personalizado.">
+          {otherMode ? (
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                className={inputCls}
+                value={input.ambiente.ambiente}
+                onChange={(e) => set("ambiente", { ambiente: e.target.value })}
+                placeholder="Ex: Galeria de arte, Sala de música…"
+              />
+              <button
+                type="button"
+                onClick={() => { setOtherMode(false); set("ambiente", { ambiente: AMBIENTES[0] }); }}
+                className="px-3 rounded-md border border-white/[0.06] text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors"
+              >
+                Lista
+              </button>
+            </div>
+          ) : (
+            <select
+              className={selectCls}
+              value={isPreset ? input.ambiente.ambiente : "__other"}
+              onChange={(e) => {
+                if (e.target.value === "__other") {
+                  setOtherMode(true);
+                  set("ambiente", { ambiente: "" });
+                } else {
+                  set("ambiente", { ambiente: e.target.value });
+                }
+              }}
+            >
+              {AMBIENTES.map((a) => <option key={a} value={a}>{a}</option>)}
+              <option value="__other">Outro (personalizado)…</option>
+            </select>
+          )}
         </Field>
+
         <div className="md:col-span-2">
           <Field label="Observações">
             <textarea rows={3} className={inputCls} value={input.ambiente.observacoes ?? ""} onChange={(e) => set("ambiente", { observacoes: e.target.value })} placeholder="Detalhes do ambiente, preferências do cliente..." />
@@ -251,27 +307,27 @@ function StepEstrutura({ input, set, alertaTecido, alertaForro, estoqueTecido, e
       <StepTitle eyebrow="Etapa 3 · Estrutura" title="Defina cortina, tecidos e acabamentos" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8">
         <Field label="Modelo">
-          <select className={inputCls} value={e.modelo} onChange={(ev) => set("estrutura", { modelo: ev.target.value })}>
+          <select className={selectCls} value={e.modelo} onChange={(ev) => set("estrutura", { modelo: ev.target.value })}>
             {MODELOS.map((m) => <option key={m}>{m}</option>)}
           </select>
         </Field>
         <Toggle label="Motorizada" hint="Acionamento elétrico" v={e.motorizada} set={(v) => set("estrutura", { motorizada: v })} />
 
         <Field label="Tecido principal" hint={alertaTecido ? `Estoque insuficiente · ${estoqueTecido}m disponíveis` : estoqueTecido != null ? `${estoqueTecido}m em estoque` : undefined}>
-          <select className={`${inputCls} ${alertaTecido ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={e.tecidoCodigo} onChange={(ev) => set("estrutura", { tecidoCodigo: +ev.target.value })}>
+          <select className={`${selectCls} ${alertaTecido ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={e.tecidoCodigo} onChange={(ev) => set("estrutura", { tecidoCodigo: +ev.target.value })}>
             {CATALOGO_TECIDOS.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
           </select>
         </Field>
 
         <Field label="Forro" hint={e.forroCodigo == null ? "Sem forro" : alertaForro ? `Estoque insuficiente · ${estoqueForro}m` : estoqueForro != null ? `${estoqueForro}m em estoque` : undefined}>
-          <select className={`${inputCls} ${alertaForro ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={e.forroCodigo ?? "none"} onChange={(ev) => set("estrutura", { forroCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
+          <select className={`${selectCls} ${alertaForro ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={e.forroCodigo ?? "none"} onChange={(ev) => set("estrutura", { forroCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
             <option value="none">Sem forro</option>
             {CATALOGO_FORROS.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
           </select>
         </Field>
 
         <Field label="Blackout" hint={e.blackoutCodigo == null ? "Sem blackout" : "Trilho duplo inferido"}>
-          <select className={inputCls} value={e.blackoutCodigo ?? "none"} onChange={(ev) => set("estrutura", { blackoutCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
+          <select className={selectCls} value={e.blackoutCodigo ?? "none"} onChange={(ev) => set("estrutura", { blackoutCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
             <option value="none">Sem blackout</option>
             {CATALOGO_BLACKOUTS.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
           </select>
@@ -315,7 +371,7 @@ function StepComposicao({ input, set, result }: any) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
           <Toggle label="Instalar no local" hint="Inclui colocação" v={i.instalar} set={(v) => set("instalacao", { instalar: v })} />
           <Field label="Dificuldade">
-            <select className={inputCls} value={i.dificuldade} onChange={(e) => set("instalacao", { dificuldade: e.target.value })}>
+            <select className={selectCls} value={i.dificuldade} onChange={(e) => set("instalacao", { dificuldade: e.target.value })}>
               <option>Padrão</option>
               <option>Difícil</option>
             </select>
@@ -337,7 +393,7 @@ function StepComercial({ input, set, result }: any) {
       <StepTitle eyebrow="Etapa 5 · Comercial" title="Condições de pagamento" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8">
         <Field label="Forma de pagamento">
-          <select className={inputCls} value={c.forma} onChange={(e) => set("comercial", { forma: e.target.value })}>
+          <select className={selectCls} value={c.forma} onChange={(e) => set("comercial", { forma: e.target.value })}>
             {FORMAS.map((f) => <option key={f}>{f}</option>)}
           </select>
         </Field>
