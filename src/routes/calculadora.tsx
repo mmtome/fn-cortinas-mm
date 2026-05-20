@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Save, ArrowRight, ArrowLeft, Check, Ruler, User2, Layers, Wrench, Wallet, AlertTriangle, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { PageHeader, GoldButton, Field, inputCls } from "@/components/ui-kit";
+import { PageHeader, GoldButton, Field, inputCls, selectCls } from "@/components/ui-kit";
 import {
   calcular,
   defaultPricingInput,
@@ -26,7 +26,26 @@ const STEPS = [
   { key: "comercial",   label: "Comercial",   icon: Wallet },
 ] as const;
 
-const AMBIENTES = ["Sala", "Sala de Jantar", "Suíte Master", "Quarto", "Home Office", "Cozinha", "Sacada", "Showroom"];
+const AMBIENTES = [
+  "Sala de Estar",
+  "Sala de Jantar",
+  "Suíte Master",
+  "Suíte de Hóspedes",
+  "Closet",
+  "Home Theater",
+  "Home Office",
+  "Biblioteca",
+  "Lavabo",
+  "Cozinha Gourmet",
+  "Sala de Estar do Pavimento Superior",
+  "Varanda Gourmet",
+  "Sacada Panorâmica",
+  "Adega Climatizada",
+  "Spa & Sauna",
+  "Quadra / Salão de Jogos",
+  "Hall de Entrada",
+  "Showroom",
+];
 const MODELOS = ["Wave", "Prega macho", "Prega americana", "Persiana"] as const;
 const FORMAS = ["Pix", "Cartão Débito", "Cartão Crédito 1x", "Cartão Crédito Parcelado", "Dinheiro"] as const;
 
@@ -158,6 +177,10 @@ function Stepper({ step, onPick }: { step: number; onPick: (i: number) => void }
 // STEP 1 — Cliente e Ambiente
 // =========================================================
 function StepCliente({ input, set }: any) {
+  const isPreset = AMBIENTES.includes(input.ambiente.ambiente);
+  const isOther = !isPreset && input.ambiente.ambiente !== "";
+  const [otherMode, setOtherMode] = useState(isOther);
+
   return (
     <div>
       <StepTitle eyebrow="Etapa 1 · Cliente" title="Para quem é este orçamento?" />
@@ -165,11 +188,44 @@ function StepCliente({ input, set }: any) {
         <Field label="Nome do cliente">
           <input className={inputCls} value={input.ambiente.cliente} onChange={(e) => set("ambiente", { cliente: e.target.value })} placeholder="Ex: Marina Albuquerque" />
         </Field>
-        <Field label="Ambiente">
-          <select className={inputCls} value={input.ambiente.ambiente} onChange={(e) => set("ambiente", { ambiente: e.target.value })}>
-            {AMBIENTES.map((a) => <option key={a}>{a}</option>)}
-          </select>
+
+        <Field label="Ambiente" hint="Selecione um ambiente ou descreva um personalizado.">
+          {otherMode ? (
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                className={inputCls}
+                value={input.ambiente.ambiente}
+                onChange={(e) => set("ambiente", { ambiente: e.target.value })}
+                placeholder="Ex: Galeria de arte, Sala de música…"
+              />
+              <button
+                type="button"
+                onClick={() => { setOtherMode(false); set("ambiente", { ambiente: AMBIENTES[0] }); }}
+                className="px-3 rounded-md border border-white/[0.06] text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors"
+              >
+                Lista
+              </button>
+            </div>
+          ) : (
+            <select
+              className={selectCls}
+              value={isPreset ? input.ambiente.ambiente : "__other"}
+              onChange={(e) => {
+                if (e.target.value === "__other") {
+                  setOtherMode(true);
+                  set("ambiente", { ambiente: "" });
+                } else {
+                  set("ambiente", { ambiente: e.target.value });
+                }
+              }}
+            >
+              {AMBIENTES.map((a) => <option key={a} value={a}>{a}</option>)}
+              <option value="__other">Outro (personalizado)…</option>
+            </select>
+          )}
         </Field>
+
         <div className="md:col-span-2">
           <Field label="Observações">
             <textarea rows={3} className={inputCls} value={input.ambiente.observacoes ?? ""} onChange={(e) => set("ambiente", { observacoes: e.target.value })} placeholder="Detalhes do ambiente, preferências do cliente..." />
