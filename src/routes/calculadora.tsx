@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Save, ArrowRight, ArrowLeft, Check, Ruler, User2, Layers, Wrench, Wallet, AlertTriangle } from "lucide-react";
+import { Save, ArrowRight, ArrowLeft, Check, Ruler, User2, Layers, Wrench, Wallet, AlertTriangle, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader, GoldButton, Field, inputCls } from "@/components/ui-kit";
 import {
@@ -9,6 +9,7 @@ import {
   formatBRL,
   CATALOGO_TECIDOS,
   CATALOGO_FORROS,
+  CATALOGO_BLACKOUTS,
   type PricingInput,
 } from "@/lib/pricing-engine";
 import { useStore, store } from "@/lib/store";
@@ -18,17 +19,15 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/calculadora")({ component: Calculadora });
 
 const STEPS = [
-  { key: "cliente",   label: "Cliente",    icon: User2 },
-  { key: "medidas",   label: "Medidas",    icon: Ruler },
-  { key: "estrutura", label: "Estrutura",  icon: Layers },
-  { key: "instalacao",label: "Instalação", icon: Wrench },
-  { key: "comercial", label: "Comercial",  icon: Wallet },
+  { key: "cliente",     label: "Cliente",     icon: User2 },
+  { key: "medidas",     label: "Medidas",     icon: Ruler },
+  { key: "estrutura",   label: "Estrutura",   icon: Layers },
+  { key: "composicao",  label: "Composição",  icon: Wrench },
+  { key: "comercial",   label: "Comercial",   icon: Wallet },
 ] as const;
 
 const AMBIENTES = ["Sala", "Sala de Jantar", "Suíte Master", "Quarto", "Home Office", "Cozinha", "Sacada", "Showroom"];
 const MODELOS = ["Wave", "Prega macho", "Prega americana", "Persiana"] as const;
-const PERFIS = ["Varão suíço", "Trilho simples", "Trilho duplo"] as const;
-const TIPOS_PERFIL = ["Simples 1 p/ metro", "Duplo 1 p/ metro", "1 para 1", "1 para 2"] as const;
 const FORMAS = ["Pix", "Cartão Débito", "Cartão Crédito 1x", "Cartão Crédito Parcelado", "Dinheiro"] as const;
 
 function Calculadora() {
@@ -39,10 +38,9 @@ function Calculadora() {
 
   const result = useMemo(() => calcular(input), [input]);
 
-  // Estoque influencia: verifica disponibilidade do tecido selecionado
   const estoqueTecido = metrosDisponiveis(stock, input.estrutura.tecidoCodigo);
   const estoqueForro = metrosDisponiveis(stock, input.estrutura.forroCodigo ?? undefined);
-  const alertaTecido = estoqueTecido !== null && estoqueTecido < result.mtsCortina;
+  const alertaTecido = estoqueTecido !== null && estoqueTecido < result.mtsTecido;
   const alertaForro = estoqueForro !== null && input.estrutura.forroCodigo != null && estoqueForro < result.mtsForro;
 
   const set = <K extends keyof PricingInput>(k: K, v: Partial<PricingInput[K]>) =>
@@ -77,19 +75,18 @@ function Calculadora() {
       <PageHeader
         eyebrow="Configurador"
         title="Nova precificação"
-        subtitle="Conduza o orçamento em etapas. O total é recalculado a cada ajuste."
+        subtitle="Conduza a visita em cinco passos. A composição técnica é gerada automaticamente."
       />
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-10">
-        {/* COLUNA PRINCIPAL — STEPPER */}
         <div>
           <Stepper step={step} onPick={setStep} />
 
-          <div className="surface rounded-2xl p-8 mt-6 min-h-[420px]">
+          <div className="surface rounded-2xl p-8 mt-6 min-h-[440px]">
             {step === 0 && <StepCliente input={input} set={set} />}
             {step === 1 && <StepMedidas input={input} set={set} />}
             {step === 2 && <StepEstrutura input={input} set={set} alertaTecido={alertaTecido} alertaForro={alertaForro} estoqueTecido={estoqueTecido} estoqueForro={estoqueForro} />}
-            {step === 3 && <StepInstalacao input={input} set={set} />}
+            {step === 3 && <StepComposicao input={input} set={set} result={result} />}
             {step === 4 && <StepComercial input={input} set={set} result={result} />}
 
             <div className="flex items-center justify-between mt-10 pt-6 border-t border-white/[0.05]">
@@ -114,7 +111,6 @@ function Calculadora() {
           </div>
         </div>
 
-        {/* RESUMO EM TEMPO REAL */}
         <ResumoLateral input={input} result={result} alerta={alertaTecido || alertaForro} />
       </div>
     </AppShell>
@@ -132,11 +128,7 @@ function Stepper({ step, onPick }: { step: number; onPick: (i: number) => void }
         const done = i < step;
         const Icon = s.icon;
         return (
-          <button
-            key={s.key}
-            onClick={() => onPick(i)}
-            className="flex-1 flex items-center gap-3 group"
-          >
+          <button key={s.key} onClick={() => onPick(i)} className="flex-1 flex items-center gap-3 group">
             <div
               className={`flex items-center justify-center w-8 h-8 rounded-full text-[11px] border transition-colors ${
                 active
@@ -149,10 +141,10 @@ function Stepper({ step, onPick }: { step: number; onPick: (i: number) => void }
               {done ? <Check className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
             </div>
             <div className="hidden md:block text-left">
-              <div className={`text-[11px] uppercase tracking-[0.14em] ${active ? "text-foreground" : "text-muted-foreground"}`}>
+              <div className={`text-[10px] uppercase tracking-[0.16em] ${active ? "text-foreground" : "text-muted-foreground"}`}>
                 Etapa {i + 1}
               </div>
-              <div className={`text-[13px] ${active ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</div>
+              <div className={`text-[12px] ${active ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</div>
             </div>
             {i < STEPS.length - 1 && <div className="flex-1 h-px bg-white/[0.05] mx-3" />}
           </button>
@@ -171,31 +163,16 @@ function StepCliente({ input, set }: any) {
       <StepTitle eyebrow="Etapa 1 · Cliente" title="Para quem é este orçamento?" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8">
         <Field label="Nome do cliente">
-          <input
-            className={inputCls}
-            value={input.ambiente.cliente}
-            onChange={(e) => set("ambiente", { cliente: e.target.value })}
-            placeholder="Ex: Marina Albuquerque"
-          />
+          <input className={inputCls} value={input.ambiente.cliente} onChange={(e) => set("ambiente", { cliente: e.target.value })} placeholder="Ex: Marina Albuquerque" />
         </Field>
         <Field label="Ambiente">
-          <select
-            className={inputCls}
-            value={input.ambiente.ambiente}
-            onChange={(e) => set("ambiente", { ambiente: e.target.value })}
-          >
+          <select className={inputCls} value={input.ambiente.ambiente} onChange={(e) => set("ambiente", { ambiente: e.target.value })}>
             {AMBIENTES.map((a) => <option key={a}>{a}</option>)}
           </select>
         </Field>
         <div className="md:col-span-2">
           <Field label="Observações">
-            <textarea
-              rows={3}
-              className={inputCls}
-              value={input.ambiente.observacoes ?? ""}
-              onChange={(e) => set("ambiente", { observacoes: e.target.value })}
-              placeholder="Detalhes do ambiente, preferências do cliente..."
-            />
+            <textarea rows={3} className={inputCls} value={input.ambiente.observacoes ?? ""} onChange={(e) => set("ambiente", { observacoes: e.target.value })} placeholder="Detalhes do ambiente, preferências do cliente..." />
           </Field>
         </div>
       </div>
@@ -212,119 +189,96 @@ function StepMedidas({ input, set }: any) {
     <div>
       <StepTitle eyebrow="Etapa 2 · Medidas" title="Tome as medidas do ambiente" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
-        <div className="grid grid-cols-2 gap-4">
-          <NumField label="Largura parede" v={m.larguraParede} set={(v) => set("medidas", { larguraParede: v })} suf="m" />
-          <NumField label="Altura parede" v={m.alturaParede} set={(v) => set("medidas", { alturaParede: v })} suf="m" />
-          <NumField label="Largura janela" v={m.larguraJanela} set={(v) => set("medidas", { larguraJanela: v })} suf="m" />
-          <NumField label="Altura janela" v={m.alturaJanela} set={(v) => set("medidas", { alturaJanela: v })} suf="m" />
+        <div>
+          <SubLabel>Parede</SubLabel>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <NumField label="Largura" v={m.larguraParede} set={(v) => set("medidas", { larguraParede: v })} suf="m" />
+            <NumField label="Altura" v={m.alturaParede} set={(v) => set("medidas", { alturaParede: v })} suf="m" />
+          </div>
+          <SubLabel>Janela</SubLabel>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <NumField label="Largura" v={m.larguraJanela} set={(v) => set("medidas", { larguraJanela: v })} suf="m" />
+            <NumField label="Altura" v={m.alturaJanela} set={(v) => set("medidas", { alturaJanela: v })} suf="m" />
+          </div>
+          <SubLabel>Cortina desejada</SubLabel>
+          <div className="grid grid-cols-2 gap-4">
+            <NumField label="Largura" v={m.larguraCortina} set={(v) => set("medidas", { larguraCortina: v })} suf="m" />
+            <NumField label="Altura" v={m.alturaCortina} set={(v) => set("medidas", { alturaCortina: v })} suf="m" />
+          </div>
         </div>
-        {/* Preview técnico */}
         <div className="surface-flat rounded-xl p-6 flex items-center justify-center">
           <PreviewJanela {...m} />
         </div>
       </div>
-      {m.alturaJanela > 4.5 && (
+      {m.alturaCortina > 4.5 && (
         <div className="mt-6 flex items-center gap-2 text-[12px] text-gold">
-          <AlertTriangle className="w-3.5 h-3.5" /> Altura acima de 4,5m — andaime será incluído automaticamente.
+          <AlertTriangle className="w-3.5 h-3.5" /> Altura acima de 4,5m — andaime incluído automaticamente.
         </div>
       )}
     </div>
   );
 }
 
-function PreviewJanela({ larguraParede, alturaParede, larguraJanela, alturaJanela }: any) {
-  const scaleW = 220 / Math.max(larguraParede, 0.1);
-  const scaleH = 160 / Math.max(alturaParede, 0.1);
+function PreviewJanela({ larguraParede, alturaParede, larguraJanela, alturaJanela, larguraCortina, alturaCortina }: any) {
+  const scaleW = 240 / Math.max(larguraParede, larguraCortina, 0.1);
+  const scaleH = 170 / Math.max(alturaParede, alturaCortina, 0.1);
   const scale = Math.min(scaleW, scaleH);
   const pW = larguraParede * scale;
   const pH = alturaParede * scale;
   const jW = Math.min(larguraJanela, larguraParede) * scale;
   const jH = Math.min(alturaJanela, alturaParede) * scale;
+  const cW = Math.min(larguraCortina, larguraParede) * scale;
+  const cH = Math.min(alturaCortina, alturaParede) * scale;
   return (
     <svg width={pW + 60} height={pH + 60} className="overflow-visible">
-      {/* parede */}
-      <rect x={30} y={30} width={pW} height={pH} fill="none" stroke="oklch(1 0 0 / 0.12)" strokeWidth={1} />
-      {/* janela centrada */}
-      <rect x={30 + (pW - jW) / 2} y={30 + (pH - jH)} width={jW} height={jH} fill="oklch(0.80 0.10 88 / 0.05)" stroke="oklch(0.80 0.10 88 / 0.5)" strokeWidth={1} />
-      {/* cotas */}
-      <text x={30 + pW / 2} y={20} fontSize={10} fill="oklch(0.62 0.012 260)" textAnchor="middle">{larguraParede}m</text>
-      <text x={20} y={30 + pH / 2} fontSize={10} fill="oklch(0.62 0.012 260)" textAnchor="middle" transform={`rotate(-90 20 ${30 + pH / 2})`}>{alturaParede}m</text>
-      <text x={30 + pW / 2} y={30 + pH + 18} fontSize={10} fill="var(--gold)" textAnchor="middle">{larguraJanela} × {alturaJanela}m</text>
+      <rect x={30} y={30} width={pW} height={pH} fill="none" stroke="oklch(1 0 0 / 0.10)" strokeWidth={1} />
+      <rect x={30 + (pW - jW) / 2} y={30 + (pH - jH)} width={jW} height={jH} fill="oklch(1 0 0 / 0.03)" stroke="oklch(1 0 0 / 0.18)" strokeWidth={1} />
+      {/* cortina prevista */}
+      <rect x={30 + (pW - cW) / 2} y={30 + (pH - cH)} width={cW} height={cH} fill="oklch(0.80 0.10 88 / 0.04)" stroke="oklch(0.80 0.10 88 / 0.45)" strokeDasharray="3 3" strokeWidth={1} />
+      <text x={30 + pW / 2} y={20} fontSize={9} fill="oklch(0.62 0.012 260)" textAnchor="middle">parede {larguraParede}m</text>
+      <text x={30 + pW / 2} y={30 + pH + 18} fontSize={9} fill="var(--gold)" textAnchor="middle">cortina {larguraCortina} × {alturaCortina}m</text>
     </svg>
   );
 }
 
 // =========================================================
-// STEP 3 — Estrutura
+// STEP 3 — Estrutura (sem perguntar trilho/perfil)
 // =========================================================
 function StepEstrutura({ input, set, alertaTecido, alertaForro, estoqueTecido, estoqueForro }: any) {
   const e = input.estrutura;
   return (
     <div>
-      <StepTitle eyebrow="Etapa 3 · Estrutura" title="Defina cortina, tecido e perfil" />
+      <StepTitle eyebrow="Etapa 3 · Estrutura" title="Defina cortina, tecidos e acabamentos" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8">
         <Field label="Modelo">
           <select className={inputCls} value={e.modelo} onChange={(ev) => set("estrutura", { modelo: ev.target.value })}>
             {MODELOS.map((m) => <option key={m}>{m}</option>)}
           </select>
         </Field>
-        <Field label="Folhas">
-          <input type="number" min={1} className={inputCls} value={e.folhas} onChange={(ev) => set("estrutura", { folhas: +ev.target.value })} />
-        </Field>
+        <Toggle label="Motorizada" hint="Acionamento elétrico" v={e.motorizada} set={(v) => set("estrutura", { motorizada: v })} />
 
-        <Field label="Tecido" hint={alertaTecido ? `Estoque insuficiente · ${estoqueTecido}m disponíveis` : estoqueTecido != null ? `${estoqueTecido}m em estoque` : undefined}>
-          <select
-            className={`${inputCls} ${alertaTecido ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`}
-            value={e.tecidoCodigo}
-            onChange={(ev) => set("estrutura", { tecidoCodigo: +ev.target.value })}
-          >
+        <Field label="Tecido principal" hint={alertaTecido ? `Estoque insuficiente · ${estoqueTecido}m disponíveis` : estoqueTecido != null ? `${estoqueTecido}m em estoque` : undefined}>
+          <select className={`${inputCls} ${alertaTecido ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={e.tecidoCodigo} onChange={(ev) => set("estrutura", { tecidoCodigo: +ev.target.value })}>
             {CATALOGO_TECIDOS.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
           </select>
         </Field>
 
         <Field label="Forro" hint={e.forroCodigo == null ? "Sem forro" : alertaForro ? `Estoque insuficiente · ${estoqueForro}m` : estoqueForro != null ? `${estoqueForro}m em estoque` : undefined}>
-          <select
-            className={`${inputCls} ${alertaForro ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`}
-            value={e.forroCodigo ?? "none"}
-            onChange={(ev) => set("estrutura", { forroCodigo: ev.target.value === "none" ? null : +ev.target.value })}
-          >
+          <select className={`${inputCls} ${alertaForro ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={e.forroCodigo ?? "none"} onChange={(ev) => set("estrutura", { forroCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
             <option value="none">Sem forro</option>
             {CATALOGO_FORROS.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
           </select>
         </Field>
 
-        <Field label="Perfil">
-          <select className={inputCls} value={e.perfil} onChange={(ev) => set("estrutura", { perfil: ev.target.value })}>
-            {PERFIS.map((p) => <option key={p}>{p}</option>)}
-          </select>
-        </Field>
-        <Field label="Tipo de perfil">
-          <select className={inputCls} value={e.tipoPerfil} onChange={(ev) => set("estrutura", { tipoPerfil: ev.target.value })}>
-            {TIPOS_PERFIL.map((p) => <option key={p}>{p}</option>)}
+        <Field label="Blackout" hint={e.blackoutCodigo == null ? "Sem blackout" : "Trilho duplo inferido"}>
+          <select className={inputCls} value={e.blackoutCodigo ?? "none"} onChange={(ev) => set("estrutura", { blackoutCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
+            <option value="none">Sem blackout</option>
+            {CATALOGO_BLACKOUTS.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
           </select>
         </Field>
 
-        <Toggle
-          label="Costura × Forro"
-          hint="Forro costurado junto à cortina"
-          v={e.costuraXForro}
-          set={(v) => set("estrutura", { costuraXForro: v })}
-        />
-        <Toggle
-          label="Motorizada"
-          hint="Acionamento elétrico"
-          v={e.motorizada}
-          set={(v) => set("estrutura", { motorizada: v })}
-        />
-
-        <Toggle
-          label="Comando"
-          hint="Cordão para abertura (cortinas > 4m)"
-          v={e.comando}
-          set={(v) => set("estrutura", { comando: v })}
-        />
-        {e.comando && (
-          <NumField label="Valor do comando (R$)" v={e.comandoValor ?? 0} set={(v) => set("estrutura", { comandoValor: v })} />
+        {e.forroCodigo != null && (
+          <Toggle label="Forro costurado junto" hint="Quando marcado, trilho permanece simples" v={e.costuraXForro} set={(v) => set("estrutura", { costuraXForro: v })} />
         )}
       </div>
     </div>
@@ -332,22 +286,42 @@ function StepEstrutura({ input, set, alertaTecido, alertaForro, estoqueTecido, e
 }
 
 // =========================================================
-// STEP 4 — Instalação
+// STEP 4 — Composição automática + Instalação
 // =========================================================
-function StepInstalacao({ input, set }: any) {
+function StepComposicao({ input, set, result }: any) {
   const i = input.instalacao;
   return (
     <div>
-      <StepTitle eyebrow="Etapa 4 · Instalação" title="Logística e execução" />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8">
-        <Toggle label="Instalação" hint="Inclui colocação no local" v={i.instalar} set={(v) => set("instalacao", { instalar: v })} />
-        <Field label="Dificuldade">
-          <select className={inputCls} value={i.dificuldade} onChange={(e) => set("instalacao", { dificuldade: e.target.value })}>
-            <option>Padrão</option>
-            <option>Difícil</option>
-          </select>
-        </Field>
-        <NumField label="Deslocamento (R$)" v={i.deslocamento} set={(v) => set("instalacao", { deslocamento: v })} />
+      <StepTitle eyebrow="Etapa 4 · Composição" title="Necessidade técnica calculada" />
+      <div className="mt-2 text-[12px] text-muted-foreground flex items-center gap-2">
+        <Sparkles className="w-3 h-3 text-gold" />
+        Gerado automaticamente a partir das medidas e estrutura.
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-white/[0.05] rounded-xl overflow-hidden mt-8">
+        <Tile label="Cortina pronta" value={`${result.mtsProntos.toFixed(2)} m`} />
+        <Tile label="Tecido" value={`${result.mtsTecido.toFixed(2)} m`} />
+        {result.mtsForro > 0 && <Tile label="Forro" value={`${result.mtsForro.toFixed(2)} m`} />}
+        {result.mtsBlackout > 0 && <Tile label="Blackout" value={`${result.mtsBlackout.toFixed(2)} m`} />}
+        {result.mtsEntretela > 0 && <Tile label="Entretela" value={`${result.mtsEntretela.toFixed(2)} m`} />}
+        {result.mtsCordao > 0 && <Tile label="Cordão Wave" value={`${result.mtsCordao.toFixed(2)} m`} />}
+        <Tile label="Rodízios" value={`${result.qtdRodizios} un`} />
+        <Tile label={result.trilhoInferido} value={`${result.mtsTrilho.toFixed(2)} m`} />
+        <Tile label="Mão de obra" value={formatBRL(result.custoMaoObra)} />
+      </div>
+
+      <div className="mt-10">
+        <SubLabel>Instalação</SubLabel>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+          <Toggle label="Instalar no local" hint="Inclui colocação" v={i.instalar} set={(v) => set("instalacao", { instalar: v })} />
+          <Field label="Dificuldade">
+            <select className={inputCls} value={i.dificuldade} onChange={(e) => set("instalacao", { dificuldade: e.target.value })}>
+              <option>Padrão</option>
+              <option>Difícil</option>
+            </select>
+          </Field>
+          <NumField label="Deslocamento (R$)" v={i.deslocamento} set={(v) => set("instalacao", { deslocamento: v })} />
+        </div>
       </div>
     </div>
   );
@@ -394,34 +368,38 @@ function ResumoLateral({ input, result, alerta }: any) {
   return (
     <div className="xl:sticky xl:top-6 self-start space-y-3">
       <div className="surface rounded-2xl p-6">
-        <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Resumo</div>
-        <div className="text-[14px] mt-2">{input.ambiente.cliente || "Novo cliente"}</div>
-        <div className="text-[12px] text-muted-foreground">{input.ambiente.ambiente}</div>
+        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Resumo</div>
+        <div className="text-[13px] mt-2">{input.ambiente.cliente || "Novo cliente"}</div>
+        <div className="text-[11px] text-muted-foreground">{input.ambiente.ambiente}</div>
 
         <div className="hairline my-5" />
 
         <SectionTitle>Necessidade técnica</SectionTitle>
-        <Row k="Tecido cortina" v={`${result.mtsCortina.toFixed(2)} m`} />
-        <Row k="Alturas (cortina)" v={`${result.qntdAlturasCortina}`} />
-        {result.mtsForro > 0 && <Row k="Tecido forro" v={`${result.mtsForro.toFixed(2)} m`} />}
+        <Row k="Cortina pronta" v={`${result.mtsProntos.toFixed(2)} m`} />
+        <Row k="Tecido" v={`${result.mtsTecido.toFixed(2)} m`} />
+        {result.mtsForro > 0 && <Row k="Forro" v={`${result.mtsForro.toFixed(2)} m`} />}
+        {result.mtsBlackout > 0 && <Row k="Blackout" v={`${result.mtsBlackout.toFixed(2)} m`} />}
+        <Row k="Rodízios" v={`${result.qtdRodizios} un`} />
+        <Row k={result.trilhoInferido} v={`${result.mtsTrilho.toFixed(2)} m`} />
 
         <div className="hairline my-5" />
 
         <SectionTitle>Composição</SectionTitle>
         <Row k="Tecido" v={formatBRL(result.custoTecido)} muted />
         {result.custoForro > 0 && <Row k="Forro" v={formatBRL(result.custoForro)} muted />}
+        {result.custoBlackout > 0 && <Row k="Blackout" v={formatBRL(result.custoBlackout)} muted />}
         <Row k="Mão de obra" v={formatBRL(result.custoMaoObra)} muted />
-        <Row k="Trilho / varão" v={formatBRL(result.custoTrilho)} muted />
-        {result.custoCordao > 0 && <Row k="Cordão Wave" v={formatBRL(result.custoCordao)} muted />}
-        <Row k="Rodízio" v={formatBRL(result.custoRodizio)} muted />
+        <Row k="Trilho" v={formatBRL(result.custoTrilho)} muted />
+        {result.custoCordao > 0 && <Row k="Cordão" v={formatBRL(result.custoCordao)} muted />}
+        <Row k="Rodízios" v={formatBRL(result.custoRodizio)} muted />
         {result.custoEntretela > 0 && <Row k="Entretela" v={formatBRL(result.custoEntretela)} muted />}
         {result.custoInstalacao > 0 && <Row k="Instalação" v={formatBRL(result.custoInstalacao)} muted />}
 
         <div className="hairline my-5" />
 
         <div className="flex items-baseline justify-between">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Total</div>
-          <div className="text-[20px] font-medium tracking-tight stat">{formatBRL(result.totalFinal)}</div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Total</div>
+          <div className="text-[18px] font-medium tracking-tight stat">{formatBRL(result.totalFinal)}</div>
         </div>
         {input.comercial.parcelas > 1 && (
           <div className="text-[11px] text-muted-foreground mt-1 text-right">
@@ -443,21 +421,22 @@ function ResumoLateral({ input, result, alerta }: any) {
 }
 
 // =========================================================
-// Helpers visuais
+// Helpers
 // =========================================================
 function StepTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
     <div>
-      <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{eyebrow}</div>
-      <div className="text-[20px] font-medium tracking-tight mt-2">{title}</div>
+      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{eyebrow}</div>
+      <div className="text-[18px] font-medium tracking-tight mt-2">{title}</div>
     </div>
   );
 }
-
+function SubLabel({ children }: { children: React.ReactNode }) {
+  return <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-3">{children}</div>;
+}
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2.5">{children}</div>;
 }
-
 function Row({ k, v, muted }: { k: string; v: string; muted?: boolean }) {
   return (
     <div className={`flex justify-between text-[12px] py-1 ${muted ? "text-muted-foreground" : ""}`}>
@@ -466,7 +445,14 @@ function Row({ k, v, muted }: { k: string; v: string; muted?: boolean }) {
     </div>
   );
 }
-
+function Tile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-[var(--background)] p-5">
+      <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
+      <div className="text-[16px] font-medium tracking-tight mt-2 stat">{value}</div>
+    </div>
+  );
+}
 function NumField({ label, v, set, suf }: { label: string; v: number; set: (n: number) => void; suf?: string }) {
   return (
     <Field label={label}>
@@ -477,14 +463,13 @@ function NumField({ label, v, set, suf }: { label: string; v: number; set: (n: n
     </Field>
   );
 }
-
 function Toggle({ label, hint, v, set }: { label: string; hint?: string; v: boolean; set: (b: boolean) => void }) {
   return (
     <Field label={label} hint={hint}>
       <button
         type="button"
         onClick={() => set(!v)}
-        className={`w-full text-left px-3 py-2.5 rounded-md border text-[13px] transition-colors ${
+        className={`w-full text-left px-3 py-2.5 rounded-md border text-[12px] transition-colors ${
           v
             ? "border-[oklch(0.80_0.10_88_/_0.35)] bg-[oklch(0.80_0.10_88_/_0.05)] text-gold"
             : "border-white/[0.06] bg-white/[0.03] text-muted-foreground hover:text-foreground"
@@ -495,12 +480,11 @@ function Toggle({ label, hint, v, set }: { label: string; hint?: string; v: bool
     </Field>
   );
 }
-
 function SummaryStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <div className={`rounded-xl p-4 border ${accent ? "border-[oklch(0.80_0.10_88_/_0.3)] bg-[oklch(0.80_0.10_88_/_0.04)]" : "border-white/[0.06] bg-white/[0.02]"}`}>
       <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
-      <div className={`text-[18px] font-medium mt-2 stat ${accent ? "text-gold" : ""}`}>{value}</div>
+      <div className={`text-[16px] font-medium mt-2 stat ${accent ? "text-gold" : ""}`}>{value}</div>
     </div>
   );
 }

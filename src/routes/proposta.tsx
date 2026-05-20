@@ -108,9 +108,9 @@ function Proposta() {
       ["Modelo", cfg.estrutura.modelo],
       ["Tecido", nomeTecido(cfg.estrutura.tecidoCodigo)],
       ["Forro", nomeForro(cfg.estrutura.forroCodigo)],
-      ["Perfil", `${cfg.estrutura.perfil} · ${cfg.estrutura.tipoPerfil}`],
-      ["Medidas janela", `${cfg.medidas.larguraJanela} × ${cfg.medidas.alturaJanela} m`],
-      ["Tecido necessário", `${res.mtsCortina.toFixed(2)} m${res.mtsForro > 0 ? ` (+${res.mtsForro.toFixed(2)} m de forro)` : ""}`],
+      ["Trilho", res.trilhoInferido],
+      ["Medidas cortina", `${cfg.medidas.larguraCortina} × ${cfg.medidas.alturaCortina} m`],
+      ["Tecido necessário", `${res.mtsTecido.toFixed(2)} m${res.mtsForro > 0 ? ` (+${res.mtsForro.toFixed(2)} m de forro)` : ""}`],
       ["Instalação", cfg.instalacao.instalar ? `Inclusa · ${cfg.instalacao.dificuldade}` : "Não inclusa"],
     ];
     linhas.forEach(([k, v]) => {
@@ -228,9 +228,9 @@ function Proposta() {
                     <Spec k="Modelo" v={cfg.estrutura.modelo} />
                     <Spec k="Tecido" v={nomeTecido(cfg.estrutura.tecidoCodigo)} />
                     <Spec k="Forro" v={nomeForro(cfg.estrutura.forroCodigo)} />
-                    <Spec k="Perfil" v={`${cfg.estrutura.perfil} · ${cfg.estrutura.tipoPerfil}`} />
-                    <Spec k="Medidas" v={`${cfg.medidas.larguraJanela} × ${cfg.medidas.alturaJanela} m`} />
-                    <Spec k="Tecido total" v={`${res.mtsCortina.toFixed(2)} m${res.mtsForro > 0 ? ` + ${res.mtsForro.toFixed(2)} forro` : ""}`} />
+                    <Spec k="Trilho" v={res.trilhoInferido} />
+                    <Spec k="Medidas" v={`${cfg.medidas.larguraCortina} × ${cfg.medidas.alturaCortina} m`} />
+                    <Spec k="Tecido total" v={`${res.mtsTecido.toFixed(2)} m${res.mtsForro > 0 ? ` + ${res.mtsForro.toFixed(2)} forro` : ""}`} />
                     <Spec k="Instalação" v={cfg.instalacao.instalar ? `Inclusa · ${cfg.instalacao.dificuldade}` : "Não inclusa"} />
                   </dl>
 
