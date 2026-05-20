@@ -136,7 +136,40 @@ export function Field({
 }
 
 export const inputCls =
-  "w-full bg-white/[0.03] border border-white/[0.06] rounded-md px-3 py-2.5 text-[13px] focus:outline-none focus:border-[oklch(0.80_0.10_88_/_0.4)] focus:bg-white/[0.04] transition-colors";
+  "w-full bg-white/[0.03] border border-white/[0.06] rounded-md px-3 py-2.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[oklch(0.80_0.10_88_/_0.4)] focus:bg-white/[0.04] transition-colors";
+
+// Native <select> styled to match the brand: dark popup, light text, gold chevron.
+// `color-scheme: dark` ensures the browser native option list uses dark surface.
+export const selectCls =
+  "w-full appearance-none bg-white/[0.03] border border-white/[0.06] rounded-md pl-3 pr-9 py-2.5 text-[13px] text-foreground focus:outline-none focus:border-[oklch(0.80_0.10_88_/_0.4)] focus:bg-white/[0.04] transition-colors cursor-pointer " +
+  "[color-scheme:dark] " +
+  "[&>option]:bg-[var(--navy-deep)] [&>option]:text-foreground [&>option]:py-2 " +
+  "bg-no-repeat bg-[right_0.75rem_center] bg-[length:10px_10px] " +
+  "bg-[image:url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'><path d='M2 4l3 3 3-3' fill='none' stroke='%23c9a84c' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/></svg>\")]";
+
+export function Select({
+  value,
+  onChange,
+  children,
+  className = "",
+}: {
+  value: string | number;
+  onChange: (v: string) => void;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${selectCls} ${className}`}
+      >
+        {children}
+      </select>
+    </div>
+  );
+}
 
 // Stable date formatter — avoids SSR hydration mismatches from locale.
 export function formatDate(iso: string) {
