@@ -9,7 +9,7 @@ import { formatBRL } from "@/lib/pricing";
 
 export const Route = createFileRoute("/estoque")({ component: Estoque });
 
-const CATEGORIAS = ["Todos", "Tecido", "Rolo", "Trilho", "Varão", "Presilha", "Acessório"];
+const CATEGORIAS = ["Todos", "Tecido", "Forro", "Trilho", "Varão", "Acessório"];
 
 function Estoque() {
   const stock = useStore((s) => s.stock);
