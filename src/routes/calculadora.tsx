@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Save, Sparkles, Ruler, Scissors, Settings2 } from "lucide-react";
+import { Save, ArrowRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { PageHeader, Card, GoldButton, Field, inputCls } from "@/components/ui-kit";
+import { PageHeader, GoldButton, Field, inputCls } from "@/components/ui-kit";
 import { calcular, calcularOpcoes, formatBRL, type CalcInput } from "@/lib/pricing";
 import { store } from "@/lib/store";
 import { toast } from "sonner";
@@ -13,6 +13,15 @@ const TECIDOS = ["Linho Belga", "Veludo Champagne", "Blackout Premium", "Voil Se
 const TIPOS_CORTINA = ["Wave", "Romana", "Tradicional", "Drapeada", "Painel"];
 const TIPOS_PERSIANA = ["Nenhuma", "Romana", "Rolô", "Solar Screen", "Bandô"];
 const TRILHOS = ["Trilho Suíço", "Varão Dourado", "Trilho Motorizado", "Bandô Embutido"];
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="py-8 border-b border-white/[0.05] first:pt-0 last:border-0">
+      <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground mb-5">{title}</div>
+      {children}
+    </section>
+  );
+}
 
 function Calculadora() {
   const navigate = useNavigate();
@@ -56,7 +65,7 @@ function Calculadora() {
       data: new Date().toISOString().slice(0, 10),
       config: { ...input, result },
     });
-    toast.success("Precificação salva", { description: `Proposta de ${cliente} registrada.` });
+    toast.success("Precificação salva");
     navigate({ to: "/registros" });
   };
 
@@ -65,31 +74,24 @@ function Calculadora() {
       <PageHeader
         eyebrow="Precificação"
         title="Calculadora"
-        subtitle="Monte o orçamento em tempo real durante a visita. Cada variável se ajusta visualmente conforme o cliente observa."
+        subtitle="Configure cada variável e acompanhe o orçamento atualizado em tempo real."
         actions={
           <>
-            <GoldButton variant="outline" onClick={() => salvar("Rascunho")}>
-              <Save className="w-4 h-4" /> Salvar rascunho
+            <GoldButton variant="ghost" onClick={() => salvar("Rascunho")}>
+              <Save className="w-3.5 h-3.5" /> Rascunho
             </GoldButton>
             <GoldButton onClick={() => salvar("Enviado")}>
-              <Sparkles className="w-4 h-4" /> Finalizar proposta
+              Finalizar proposta <ArrowRight className="w-3.5 h-3.5" />
             </GoldButton>
           </>
         }
       />
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-12">
         {/* INPUTS */}
-        <div className="space-y-6">
-          {/* Cliente */}
-          <Card>
-            <div className="flex items-center gap-2 mb-5">
-              <div className="w-8 h-8 rounded-md bg-[oklch(0.78_0.13_85_/_0.1)] flex items-center justify-center text-gold">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <h3 className="font-serif text-xl">Cliente & Ambiente</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Section title="Cliente & Ambiente">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <Field label="Nome do cliente">
                 <input className={inputCls} value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Ex: Marina Albuquerque" />
               </Field>
@@ -97,41 +99,27 @@ function Calculadora() {
                 <input className={inputCls} value={ambiente} onChange={(e) => setAmbiente(e.target.value)} />
               </Field>
             </div>
-          </Card>
+          </Section>
 
-          {/* Medidas */}
-          <Card>
-            <div className="flex items-center gap-2 mb-5">
-              <div className="w-8 h-8 rounded-md bg-[oklch(0.78_0.13_85_/_0.1)] flex items-center justify-center text-gold">
-                <Ruler className="w-4 h-4" />
-              </div>
-              <h3 className="font-serif text-xl">Medidas</h3>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Field label="Largura parede (m)">
+          <Section title="Medidas (m)">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+              <Field label="Largura parede">
                 <input type="number" step="0.1" className={inputCls} value={input.larguraParede} onChange={(e) => set("larguraParede", +e.target.value)} />
               </Field>
-              <Field label="Altura parede (m)">
+              <Field label="Altura parede">
                 <input type="number" step="0.1" className={inputCls} value={input.alturaParede} onChange={(e) => set("alturaParede", +e.target.value)} />
               </Field>
-              <Field label="Largura janela (m)">
+              <Field label="Largura janela">
                 <input type="number" step="0.1" className={inputCls} value={input.larguraJanela} onChange={(e) => set("larguraJanela", +e.target.value)} />
               </Field>
-              <Field label="Altura janela (m)">
+              <Field label="Altura janela">
                 <input type="number" step="0.1" className={inputCls} value={input.alturaJanela} onChange={(e) => set("alturaJanela", +e.target.value)} />
               </Field>
             </div>
-          </Card>
+          </Section>
 
-          {/* Material */}
-          <Card>
-            <div className="flex items-center gap-2 mb-5">
-              <div className="w-8 h-8 rounded-md bg-[oklch(0.78_0.13_85_/_0.1)] flex items-center justify-center text-gold">
-                <Scissors className="w-4 h-4" />
-              </div>
-              <h3 className="font-serif text-xl">Tecido & Estrutura</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Section title="Tecido & estrutura">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <Field label="Tecido">
                 <select className={inputCls} value={input.tecido} onChange={(e) => set("tecido", e.target.value)}>
                   {TECIDOS.map((t) => <option key={t}>{t}</option>)}
@@ -142,38 +130,31 @@ function Calculadora() {
                   {TIPOS_CORTINA.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </Field>
-              <Field label="Tipo de persiana">
+              <Field label="Persiana">
                 <select className={inputCls} value={input.tipoPersiana} onChange={(e) => set("tipoPersiana", e.target.value)}>
                   {TIPOS_PERSIANA.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </Field>
-              <Field label="Trilho / Varão">
+              <Field label="Trilho / varão">
                 <select className={inputCls} value={input.trilho} onChange={(e) => set("trilho", e.target.value)}>
                   {TRILHOS.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </Field>
-              <Field label={`Franzimento: ${input.franzimento}x`}>
+              <Field label={`Franzimento · ${input.franzimento}x`}>
                 <input type="range" min="1.5" max="3" step="0.5" className="w-full accent-[var(--gold)]" value={input.franzimento} onChange={(e) => set("franzimento", +e.target.value)} />
               </Field>
-              <Field label="Presilhas / Acessórios (un)">
+              <Field label="Presilhas (un)">
                 <input type="number" className={inputCls} value={input.presilhas} onChange={(e) => set("presilhas", +e.target.value)} />
               </Field>
             </div>
-          </Card>
+          </Section>
 
-          {/* Ajustes */}
-          <Card>
-            <div className="flex items-center gap-2 mb-5">
-              <div className="w-8 h-8 rounded-md bg-[oklch(0.78_0.13_85_/_0.1)] flex items-center justify-center text-gold">
-                <Settings2 className="w-4 h-4" />
-              </div>
-              <h3 className="font-serif text-xl">Comercial</h3>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Section title="Comercial">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
               <Field label="Instalação">
                 <button
                   onClick={() => set("instalacao", !input.instalacao)}
-                  className={`${inputCls} text-left ${input.instalacao ? "text-gold border-gold" : ""}`}
+                  className={`${inputCls} text-left ${input.instalacao ? "text-gold" : "text-muted-foreground"}`}
                 >
                   {input.instalacao ? "Incluída" : "Não incluída"}
                 </button>
@@ -181,20 +162,17 @@ function Calculadora() {
               <Field label="Deslocamento (R$)">
                 <input type="number" className={inputCls} value={input.deslocamento} onChange={(e) => set("deslocamento", +e.target.value)} />
               </Field>
-              <Field label={`Margem: ${input.margem}%`}>
+              <Field label={`Margem · ${input.margem}%`}>
                 <input type="range" min="0" max="100" step="5" className="w-full accent-[var(--gold)]" value={input.margem} onChange={(e) => set("margem", +e.target.value)} />
               </Field>
-              <Field label={`Desconto: ${input.desconto}%`}>
+              <Field label={`Desconto · ${input.desconto}%`}>
                 <input type="range" min="0" max="30" step="1" className="w-full accent-[var(--gold)]" value={input.desconto} onChange={(e) => set("desconto", +e.target.value)} />
               </Field>
             </div>
-          </Card>
+          </Section>
 
-          {/* Opções */}
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-gold mb-2">Compare as opções</div>
-            <h3 className="font-serif text-2xl mb-4">Três níveis para o cliente escolher</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Section title="Compare opções">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {[
                 { key: "economica", label: "Econômica", desc: "Solução enxuta", data: opcoes.economica },
                 { key: "premium", label: "Premium", desc: "Recomendado", data: opcoes.premium, highlight: true },
@@ -202,82 +180,80 @@ function Calculadora() {
               ].map((o) => (
                 <div
                   key={o.key}
-                  className={`rounded-2xl p-6 transition-all ${
-                    o.highlight
-                      ? "glass border-gold shadow-gold"
-                      : "glass-soft hover:border-gold"
-                  }`}
+                  className={`surface rounded-xl p-5 ${o.highlight ? "border-[oklch(0.80_0.10_88_/_0.3)]" : ""}`}
                 >
-                  {o.highlight && (
-                    <div className="text-[10px] uppercase tracking-[0.2em] text-gold mb-2">Sugerido</div>
-                  )}
-                  <div className="font-serif text-xl">{o.label}</div>
-                  <div className="text-xs text-muted-foreground mb-4">{o.desc}</div>
-                  <div className="font-serif text-3xl text-gold">{formatBRL(o.data.total)}</div>
-                  <div className="text-xs text-muted-foreground mt-2">
+                  <div className="flex items-baseline justify-between mb-4">
+                    <div>
+                      <div className="text-[13px] font-medium">{o.label}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{o.desc}</div>
+                    </div>
+                    {o.highlight && <span className="text-[10px] uppercase tracking-[0.16em] text-gold">Sugerido</span>}
+                  </div>
+                  <div className="text-[20px] font-medium stat">{formatBRL(o.data.total)}</div>
+                  <div className="text-[11px] text-muted-foreground mt-1.5">
                     {o.data.tecidoMetros}m de tecido · {o.data.rolos} rolo(s)
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </Section>
         </div>
 
         {/* RESUMO STICKY */}
         <div className="xl:sticky xl:top-6 self-start">
-          <Card className="border-gold shadow-gold">
-            <div className="text-[10px] uppercase tracking-[0.25em] text-gold mb-2">Orçamento em tempo real</div>
-            <h3 className="font-serif text-2xl mb-1">{cliente || "Novo cliente"}</h3>
-            <div className="text-sm text-muted-foreground mb-6">{ambiente}</div>
+          <div className="surface rounded-xl p-6">
+            <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Orçamento</div>
+            <div className="text-[15px] font-medium mt-2">{cliente || "Novo cliente"}</div>
+            <div className="text-[12px] text-muted-foreground">{ambiente}</div>
 
-            <div className="gold-divider mb-5" />
+            <div className="hairline my-5" />
 
-            <div className="space-y-2 text-sm">
-              <Row k="Tecido necessário" v={`${result.tecidoMetros} m`} />
+            <div className="space-y-2.5 text-[12px]">
+              <Row k="Tecido" v={`${result.tecidoMetros} m`} />
               <Row k="Rolos de 3m" v={`${result.rolos} un`} />
               <Row k="Acessórios" v={`${result.acessorios} un`} />
             </div>
 
-            <div className="gold-divider my-5" />
+            <div className="hairline my-5" />
 
-            <div className="space-y-2 text-sm">
-              <Row k="Custo tecido" v={formatBRL(result.custoTecido)} muted />
-              <Row k="Custo trilho" v={formatBRL(result.custoTrilho)} muted />
-              <Row k="Custo acessórios" v={formatBRL(result.custoAcessorios)} muted />
-              <Row k="Instalação" v={formatBRL(result.custoInstalacao)} muted />
-              <Row k="Deslocamento" v={formatBRL(result.custoDeslocamento)} muted />
+            <div className="space-y-2 text-[12px] text-muted-foreground">
+              <Row k="Custo tecido" v={formatBRL(result.custoTecido)} />
+              <Row k="Custo trilho" v={formatBRL(result.custoTrilho)} />
+              <Row k="Custo acessórios" v={formatBRL(result.custoAcessorios)} />
+              <Row k="Instalação" v={formatBRL(result.custoInstalacao)} />
+              <Row k="Deslocamento" v={formatBRL(result.custoDeslocamento)} />
             </div>
 
-            <div className="gold-divider my-5" />
+            <div className="hairline my-5" />
 
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-[12px]">
               <Row k="Subtotal" v={formatBRL(result.subtotal)} />
-              <Row k={`Margem (${input.margem}%)`} v={`+ ${formatBRL(result.margemValor)}`} />
+              <Row k={`Margem ${input.margem}%`} v={`+${formatBRL(result.margemValor)}`} />
               {input.desconto > 0 && (
-                <Row k={`Desconto (${input.desconto}%)`} v={`− ${formatBRL(result.descontoValor)}`} />
+                <Row k={`Desconto ${input.desconto}%`} v={`−${formatBRL(result.descontoValor)}`} />
               )}
             </div>
 
-            <div className="mt-6 p-5 rounded-xl gradient-gold text-[var(--navy-deep)]">
-              <div className="text-[10px] uppercase tracking-[0.2em] opacity-70">Total final</div>
-              <div className="font-serif text-4xl font-semibold">{formatBRL(result.total)}</div>
+            <div className="mt-6 pt-5 border-t border-white/[0.06] flex items-baseline justify-between">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Total</div>
+              <div className="text-[22px] font-medium tracking-tight text-gold stat">{formatBRL(result.total)}</div>
             </div>
 
-            <div className="text-[10px] text-muted-foreground mt-4 leading-relaxed">
-              * Cálculo simulado. As fórmulas reais serão integradas após análise da planilha técnica.
+            <div className="text-[10px] text-muted-foreground/70 mt-5 leading-relaxed">
+              Cálculo simulado. Fórmulas reais serão integradas após análise da planilha técnica.
             </div>
-          </Card>
+          </div>
         </div>
       </div>
     </AppShell>
   );
 }
 
-function Row({ k, v, muted }: { k: string; v: string; muted?: boolean }) {
+function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex justify-between">
-      <span className={muted ? "text-muted-foreground" : ""}>{k}</span>
-      <span className={`font-medium ${muted ? "text-muted-foreground" : "text-foreground"}`}>{v}</span>
+      <span>{k}</span>
+      <span className="stat text-foreground">{v}</span>
     </div>
   );
 }

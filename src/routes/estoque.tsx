@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Package2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { PageHeader, Card, StatusBadge } from "@/components/ui-kit";
+import { PageHeader, Card, StatCard, StatusBadge } from "@/components/ui-kit";
 import { useStore } from "@/lib/store";
 import { stockStatus } from "@/lib/mockData";
 import { formatBRL } from "@/lib/pricing";
@@ -26,37 +26,25 @@ function Estoque() {
       <PageHeader
         eyebrow="Inventário"
         title="Estoque"
-        subtitle="Materiais consultados automaticamente pela calculadora durante a precificação."
+        subtitle="Materiais consultados automaticamente durante a precificação."
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Itens cadastrados</div>
-          <div className="font-serif text-3xl mt-2">{total}</div>
-        </Card>
-        <Card>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Valor em estoque</div>
-          <div className="font-serif text-3xl text-gold mt-2">{formatBRL(valor)}</div>
-        </Card>
-        <Card>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Baixo estoque</div>
-          <div className="font-serif text-3xl text-gold mt-2">{baixo}</div>
-        </Card>
-        <Card>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Indisponíveis</div>
-          <div className="font-serif text-3xl text-[oklch(0.75_0.18_25)] mt-2">{indisp}</div>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        <StatCard label="Itens cadastrados" value={String(total)} />
+        <StatCard label="Valor em estoque" value={formatBRL(valor)} />
+        <StatCard label="Baixo estoque" value={String(baixo)} />
+        <StatCard label="Indisponíveis" value={String(indisp)} />
       </div>
 
-      <div className="flex gap-2 flex-wrap mb-6">
+      <div className="flex gap-1 flex-wrap mb-6">
         {CATEGORIAS.map((c) => (
           <button
             key={c}
             onClick={() => setCat(c)}
-            className={`px-4 py-2 rounded-lg text-sm border transition-all ${
+            className={`px-3 py-2 rounded-md text-[12px] transition-colors ${
               cat === c
-                ? "border-gold text-gold bg-[oklch(0.78_0.13_85_/_0.1)]"
-                : "border-[oklch(0.78_0.13_85_/_0.18)] text-muted-foreground hover:text-foreground"
+                ? "bg-white/[0.06] text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-white/[0.03]"
             }`}
           >
             {c}
@@ -64,36 +52,35 @@ function Estoque() {
         ))}
       </div>
 
-      <Card>
+      <Card className="!p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-[10px] uppercase tracking-[0.18em] text-muted-foreground border-b border-[oklch(0.78_0.13_85_/_0.15)]">
-                <th className="pb-3 font-medium">Item</th>
-                <th className="pb-3 font-medium">Categoria</th>
-                <th className="pb-3 font-medium text-right">Quantidade</th>
-                <th className="pb-3 font-medium text-right">Custo unit.</th>
-                <th className="pb-3 font-medium">Status</th>
+              <tr className="text-left text-[11px] text-muted-foreground border-b border-white/[0.05]">
+                <th className="py-3 px-6 font-normal">Item</th>
+                <th className="py-3 font-normal">Categoria</th>
+                <th className="py-3 font-normal text-right">Quantidade</th>
+                <th className="py-3 font-normal text-right">Custo</th>
+                <th className="py-3 px-6 font-normal">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[oklch(0.78_0.13_85_/_0.08)]">
+            <tbody>
               {filtered.map((s) => (
-                <tr key={s.id} className="hover:bg-[oklch(0.78_0.13_85_/_0.04)] transition-colors">
-                  <td className="py-4">
+                <tr key={s.id} className="border-b border-white/[0.03] last:border-0 hover:bg-white/[0.015] transition-colors">
+                  <td className="py-3.5 px-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-md bg-[oklch(0.78_0.13_85_/_0.1)] flex items-center justify-center text-gold">
-                        <Package2 className="w-4 h-4" />
+                      <div className="w-7 h-7 rounded-md bg-white/[0.04] flex items-center justify-center text-muted-foreground">
+                        <Package2 className="w-3.5 h-3.5" />
                       </div>
-                      <div className="font-medium">{s.nome}</div>
+                      <div className="text-[13px]">{s.nome}</div>
                     </div>
                   </td>
-                  <td className="py-4 text-muted-foreground text-sm">{s.categoria}</td>
-                  <td className="py-4 text-right">
-                    <span className="font-serif text-lg">{s.quantidade}</span>
-                    <span className="text-muted-foreground text-sm ml-1">{s.unidade}</span>
+                  <td className="py-3.5 text-[12px] text-muted-foreground">{s.categoria}</td>
+                  <td className="py-3.5 text-right text-[13px] stat">
+                    {s.quantidade}<span className="text-muted-foreground ml-1 text-[12px]">{s.unidade}</span>
                   </td>
-                  <td className="py-4 text-right text-gold">{formatBRL(s.custo)}</td>
-                  <td className="py-4"><StatusBadge status={stockStatus(s)} /></td>
+                  <td className="py-3.5 text-right text-[13px] text-muted-foreground stat">{formatBRL(s.custo)}</td>
+                  <td className="py-3.5 px-6"><StatusBadge status={stockStatus(s)} /></td>
                 </tr>
               ))}
             </tbody>
