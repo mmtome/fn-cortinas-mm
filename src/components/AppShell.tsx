@@ -57,7 +57,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <span className="text-[13px] font-medium">FN Cortinas</span>
         </header>
-        <div className="px-8 md:px-12 py-10 max-w-[1400px] mx-auto animate-fade-in">
+        <div key={pathname} className="px-8 md:px-12 py-10 max-w-[1400px] mx-auto animate-fade-in">
           {children}
         </div>
       </main>
