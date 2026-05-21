@@ -102,11 +102,13 @@ function Calculadora() {
           <Stepper step={step} onPick={setStep} />
 
           <div className="surface rounded-2xl p-8 mt-6 min-h-[440px]">
-            {step === 0 && <StepCliente input={input} set={set} />}
-            {step === 1 && <StepMedidas input={input} set={set} />}
-            {step === 2 && <StepEstrutura input={input} set={set} alertaTecido={alertaTecido} alertaForro={alertaForro} estoqueTecido={estoqueTecido} estoqueForro={estoqueForro} />}
-            {step === 3 && <StepComposicao input={input} set={set} result={result} />}
-            {step === 4 && <StepComercial input={input} set={set} result={result} />}
+            <div key={step} className="animate-fade-in">
+              {step === 0 && <StepCliente input={input} set={set} />}
+              {step === 1 && <StepMedidas input={input} set={set} />}
+              {step === 2 && <StepEstrutura input={input} set={set} alertaTecido={alertaTecido} alertaForro={alertaForro} estoqueTecido={estoqueTecido} estoqueForro={estoqueForro} />}
+              {step === 3 && <StepComposicao input={input} set={set} result={result} />}
+              {step === 4 && <StepComercial input={input} set={set} result={result} />}
+            </div>
 
             <div className="flex items-center justify-between mt-10 pt-6 border-t border-white/[0.05]">
               <GoldButton variant="ghost" onClick={prev} className={step === 0 ? "invisible" : ""}>
