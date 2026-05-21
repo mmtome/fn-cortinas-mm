@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Save, ArrowRight, ArrowLeft, Check, Ruler, User2, Layers, Wrench, Wallet, AlertTriangle, Sparkles } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+
 import { PageHeader, GoldButton, Field, inputCls, selectCls } from "@/components/ui-kit";
 import {
   calcular,
@@ -90,7 +90,7 @@ function Calculadora() {
   };
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         eyebrow="Configurador"
         title="Nova precificação"
@@ -132,7 +132,7 @@ function Calculadora() {
 
         <ResumoLateral input={input} result={result} alerta={alertaTecido || alertaForro} />
       </div>
-    </AppShell>
+    </>
   );
 }
 

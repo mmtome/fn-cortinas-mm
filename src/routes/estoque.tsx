@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Package2 } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+
 import { PageHeader, Card, StatCard, StatusBadge } from "@/components/ui-kit";
 import { useStore } from "@/lib/store";
 import { stockStatus } from "@/lib/mockData";
@@ -22,7 +22,7 @@ function Estoque() {
   const valor = stock.reduce((a, b) => a + b.custo * b.quantidade, 0);
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         eyebrow="Inventário"
         title="Estoque"
@@ -87,6 +87,6 @@ function Estoque() {
           </table>
         </div>
       </Card>
-    </AppShell>
+    </>
   );
 }
