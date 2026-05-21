@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Eye, Pencil, Copy, FileDown, Search } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+
 import { PageHeader, Card, StatusBadge, GoldButton, inputCls, formatDate } from "@/components/ui-kit";
 import { useStore, store } from "@/lib/store";
 import { formatBRL } from "@/lib/pricing";
@@ -22,7 +22,7 @@ function Registros() {
   );
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         eyebrow="Histórico"
         title="Registros"
@@ -111,7 +111,7 @@ function Registros() {
           </table>
         </div>
       </Card>
-    </AppShell>
+    </>
   );
 }
 

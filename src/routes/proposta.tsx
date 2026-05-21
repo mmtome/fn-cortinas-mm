@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import jsPDF from "jspdf";
-import { AppShell } from "@/components/AppShell";
+
 import { PageHeader, Card, GoldButton, formatDate } from "@/components/ui-kit";
 import { useStore } from "@/lib/store";
 import { formatBRL, CATALOGO_TECIDOS, CATALOGO_FORROS } from "@/lib/pricing-engine";
@@ -169,7 +169,7 @@ function Proposta() {
   };
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         eyebrow="Proposta"
         title="Documento comercial"
@@ -259,7 +259,7 @@ function Proposta() {
           <Card>Nenhuma proposta selecionada.</Card>
         )}
       </div>
-    </AppShell>
+    </>
   );
 }
 

@@ -3,7 +3,7 @@ import { ArrowUpRight, Plus } from "lucide-react";
 import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart,
 } from "recharts";
-import { AppShell } from "@/components/AppShell";
+
 import { PageHeader, Card, StatusBadge, GoldButton, formatDate } from "@/components/ui-kit";
 import { useStore } from "@/lib/store";
 import { salesData, stockStatus } from "@/lib/mockData";
@@ -21,7 +21,7 @@ function Dashboard() {
   const criticos = stock.filter((s) => stockStatus(s) !== "disponivel").length;
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         eyebrow="Atelier"
         title="Boa visita."
@@ -145,7 +145,7 @@ function Dashboard() {
           </table>
         </div>
       </Card>
-    </AppShell>
+    </>
   );
 }
 
