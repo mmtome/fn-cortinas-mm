@@ -32,12 +32,14 @@ export function PageHeader({
 export function Card({
   children,
   className = "",
+  interactive = false,
 }: {
   children: ReactNode;
   className?: string;
+  interactive?: boolean;
 }) {
   return (
-    <div className={`surface rounded-xl p-6 ${className}`}>{children}</div>
+    <div className={`surface rounded-xl p-6 ${interactive ? "surface-hover" : ""} ${className}`}>{children}</div>
   );
 }
 
@@ -53,9 +55,9 @@ export function StatCard({
   accent?: boolean;
 }) {
   return (
-    <div className="surface rounded-xl p-5">
+    <div className="surface surface-hover rounded-xl p-5">
       <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
-      <div className="text-[22px] font-medium tracking-tight mt-3 stat">{value}</div>
+      <div key={value} className="text-[22px] font-medium tracking-tight mt-3 stat animate-value">{value}</div>
       {hint && <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>}
     </div>
   );
@@ -102,13 +104,13 @@ export function GoldButton({
   className?: string;
 }) {
   const base =
-    "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-[13px] font-medium transition-colors";
+    "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-[13px] font-medium btn-press select-none";
   const styles = {
     primary:
-      "bg-[var(--gold)] text-[var(--navy-deep)] hover:bg-[var(--gold-soft)]",
+      "bg-[var(--gold)] text-[var(--navy-deep)] hover:bg-[var(--gold-soft)] hover:shadow-[0_6px_20px_-8px_oklch(0.80_0.10_88_/_0.55)]",
     ghost: "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]",
     outline:
-      "border border-white/10 text-foreground hover:bg-white/[0.04]",
+      "border border-white/10 text-foreground hover:bg-white/[0.04] hover:border-white/20",
   };
   return (
     <button type={type} onClick={onClick} className={`${base} ${styles[variant]} ${className}`}>
@@ -136,12 +138,12 @@ export function Field({
 }
 
 export const inputCls =
-  "w-full bg-white/[0.03] border border-white/[0.06] rounded-md px-3 py-2.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[oklch(0.80_0.10_88_/_0.4)] focus:bg-white/[0.04] transition-colors";
+  "w-full bg-white/[0.03] border border-white/[0.06] rounded-md px-3 py-2.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[oklch(0.80_0.10_88_/_0.4)] focus:bg-white/[0.04] focus-ring transition-[border-color,background-color,box-shadow] duration-150 ease-premium";
 
 // Native <select> styled to match the brand: dark popup, light text, gold chevron.
 // `color-scheme: dark` ensures the browser native option list uses dark surface.
 export const selectCls =
-  "w-full appearance-none bg-white/[0.03] border border-white/[0.06] rounded-md pl-3 pr-9 py-2.5 text-[13px] text-foreground focus:outline-none focus:border-[oklch(0.80_0.10_88_/_0.4)] focus:bg-white/[0.04] transition-colors cursor-pointer " +
+  "w-full appearance-none bg-white/[0.03] border border-white/[0.06] rounded-md pl-3 pr-9 py-2.5 text-[13px] text-foreground focus:outline-none focus:border-[oklch(0.80_0.10_88_/_0.4)] focus:bg-white/[0.04] focus-ring transition-[border-color,background-color,box-shadow] duration-150 ease-premium cursor-pointer " +
   "[color-scheme:dark] " +
   "[&>option]:bg-[var(--navy-deep)] [&>option]:text-foreground [&>option]:py-2 " +
   "bg-no-repeat bg-[right_0.75rem_center] bg-[length:10px_10px] " +

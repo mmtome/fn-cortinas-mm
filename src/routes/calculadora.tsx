@@ -102,11 +102,13 @@ function Calculadora() {
           <Stepper step={step} onPick={setStep} />
 
           <div className="surface rounded-2xl p-8 mt-6 min-h-[440px]">
-            {step === 0 && <StepCliente input={input} set={set} />}
-            {step === 1 && <StepMedidas input={input} set={set} />}
-            {step === 2 && <StepEstrutura input={input} set={set} alertaTecido={alertaTecido} alertaForro={alertaForro} estoqueTecido={estoqueTecido} estoqueForro={estoqueForro} />}
-            {step === 3 && <StepComposicao input={input} set={set} result={result} />}
-            {step === 4 && <StepComercial input={input} set={set} result={result} />}
+            <div key={step} className="animate-fade-in">
+              {step === 0 && <StepCliente input={input} set={set} />}
+              {step === 1 && <StepMedidas input={input} set={set} />}
+              {step === 2 && <StepEstrutura input={input} set={set} alertaTecido={alertaTecido} alertaForro={alertaForro} estoqueTecido={estoqueTecido} estoqueForro={estoqueForro} />}
+              {step === 3 && <StepComposicao input={input} set={set} result={result} />}
+              {step === 4 && <StepComercial input={input} set={set} result={result} />}
+            </div>
 
             <div className="flex items-center justify-between mt-10 pt-6 border-t border-white/[0.05]">
               <GoldButton variant="ghost" onClick={prev} className={step === 0 ? "invisible" : ""}>
@@ -455,7 +457,7 @@ function ResumoLateral({ input, result, alerta }: any) {
 
         <div className="flex items-baseline justify-between">
           <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Total</div>
-          <div className="text-[18px] font-medium tracking-tight stat">{formatBRL(result.totalFinal)}</div>
+          <div key={result.totalFinal} className="text-[18px] font-medium tracking-tight stat animate-value">{formatBRL(result.totalFinal)}</div>
         </div>
         {input.comercial.parcelas > 1 && (
           <div className="text-[11px] text-muted-foreground mt-1 text-right">
