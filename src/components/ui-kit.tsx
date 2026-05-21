@@ -32,12 +32,14 @@ export function PageHeader({
 export function Card({
   children,
   className = "",
+  interactive = false,
 }: {
   children: ReactNode;
   className?: string;
+  interactive?: boolean;
 }) {
   return (
-    <div className={`surface rounded-xl p-6 ${className}`}>{children}</div>
+    <div className={`surface rounded-xl p-6 ${interactive ? "surface-hover" : ""} ${className}`}>{children}</div>
   );
 }
 
@@ -53,9 +55,9 @@ export function StatCard({
   accent?: boolean;
 }) {
   return (
-    <div className="surface rounded-xl p-5">
+    <div className="surface surface-hover rounded-xl p-5">
       <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
-      <div className="text-[22px] font-medium tracking-tight mt-3 stat">{value}</div>
+      <div key={value} className="text-[22px] font-medium tracking-tight mt-3 stat animate-value">{value}</div>
       {hint && <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>}
     </div>
   );
