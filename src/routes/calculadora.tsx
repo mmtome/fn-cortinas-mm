@@ -455,7 +455,7 @@ function ResumoLateral({ input, result, alerta }: any) {
 
         <div className="flex items-baseline justify-between">
           <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Total</div>
-          <div className="text-[18px] font-medium tracking-tight stat">{formatBRL(result.totalFinal)}</div>
+          <div key={result.totalFinal} className="text-[18px] font-medium tracking-tight stat animate-value">{formatBRL(result.totalFinal)}</div>
         </div>
         {input.comercial.parcelas > 1 && (
           <div className="text-[11px] text-muted-foreground mt-1 text-right">
