@@ -13,12 +13,14 @@
 //   - trilho duplo  → quando existe blackout ou forro NÃO costurado
 //   - trilho simples → 1 tecido apenas, ou forro costurado junto
 //
-// Cada função é pura e isolada. UI nunca calcula nada — apenas
-// consome estes resultados.
+// Variáveis e catálogos são editáveis pelo usuário (ver store).
+// O motor recebe um `ctx` opcional com os valores atuais; sem ele
+// usa os defaults abaixo. Cada função é pura — a UI nunca calcula.
 // ============================================================
 
-// -------------------- Constantes --------------------
-export const CONFIG = {
+// -------------------- Variáveis padrão (editáveis) --------------------
+// Tudo o que o usuário pode ajustar em "Variáveis do projeto".
+export const DEFAULT_VARS = {
   lucro: 0.30,
   jurosCartaoParcela: 0.0125,
   descontoPix: 0.01,
@@ -28,17 +30,22 @@ export const CONFIG = {
   maoDeObraPorMetroTecido: 16,
   instalacaoSemForro: 170,
   instalacaoComForro: 220,
+  fatorDificuldade: 1.4,
+
+  // Corte do tecido (rolo) — base do Guia de Cálculo
+  larguraRolo: 3.0,        // largura do rolo de tecido (m)
+  larguraUtilRolo: 2.85,   // largura útil — limite entre Caso A e Caso B
+  bainha: 0.35,            // somada à altura (bainha de cima + de baixo)
+  forroSeparadoFator: 1.2, // forro não costurado junto: largura × 1,2
 
   // Multiplicadores por metro de cortina pronta
-  fatorTecido: 3,
-  fatorEntretela: 3,
+  fatorTecido: 3,          // franzido (caimento) = 3× a largura
+  fatorEntretela: 3,       // entretela acompanha a largura franzida
   fatorCordao: 1,
   rodiziosPorMetro: 22,
-  fatorTrilho: 1,
-};
+  fatorTrilho: 1,          // trilho = largura da parede
 
-// Preços unitários dos acessórios (R$)
-export const PRECOS = {
+  // Preços unitários dos acessórios (R$)
   rodizio: 0.22,
   cordaoWavePorMetro: 5,
   entretelaPorMetro: 3,
@@ -46,6 +53,12 @@ export const PRECOS = {
   trilhoDuploPorMetro: 38,   // perfil 25 + suporte 13
   varaoSuicoPorMetro: 21,
 };
+
+export type Vars = typeof DEFAULT_VARS;
+
+// Compat: alguns lugares ainda importam CONFIG/PRECOS.
+export const CONFIG = DEFAULT_VARS;
+export const PRECOS = DEFAULT_VARS;
 
 // -------------------- Tipos --------------------
 export type FormaPagamento =
@@ -66,6 +79,7 @@ export interface Tecido {
   blackout?: boolean;
 }
 
+// Catálogos iniciais (seed). O usuário pode adicionar/editar livremente.
 export const CATALOGO_TECIDOS: Tecido[] = [
   { codigo: 1100, nome: "Cetim 3,00M Branco", largura: 3, precoMetro: 23 },
   { codigo: 1102, nome: "Cetim 3,00M Pérola", largura: 3, precoMetro: 23 },
@@ -98,8 +112,6 @@ export interface AmbienteInput {
 export interface MedidasInput {
   larguraParede: number;
   alturaParede: number;
-  larguraJanela: number;
-  alturaJanela: number;
   larguraCortina: number; // largura desejada da cortina pronta (m)
   alturaCortina: number;  // altura desejada (m)
 }
@@ -134,11 +146,24 @@ export interface PricingInput {
   comercial: ComercialInput;
 }
 
+// Contexto de cálculo: catálogos e variáveis atuais (todos opcionais).
+export interface CalcCtx {
+  tecidos?: Tecido[];
+  forros?: Tecido[];
+  blackouts?: Tecido[];
+  vars?: Partial<Vars>;
+}
+
 // -------------------- Resultado --------------------
 export interface CalcResult {
   // Composição técnica automática
-  mtsProntos: number;        // metros lineares de cortina pronta
-  mtsTecido: number;         // metros de tecido cortina
+  mtsProntos: number;        // largura da cortina pronta (m) = largura base
+  caso: "A" | "B";           // método de corte (em pé / virar o rolo)
+  alturaCorte: number;       // altura + bainha
+  nPanos: number;            // nº de panos verticais (Caso B)
+  larguraFranzida: number;   // largura × franzido (caimento)
+  sobraLateral: number;      // sobra de largura no pano emendado (Caso B)
+  mtsTecido: number;         // metros de tecido a comprar
   mtsForro: number;          // metros de forro
   mtsBlackout: number;
   mtsEntretela: number;
@@ -174,35 +199,35 @@ export interface CalcResult {
 }
 
 // ============================================================
-// FUNÇÕES ISOLADAS
+// FUNÇÕES ISOLADAS (usam defaults — mantidas para compat/testes)
 // ============================================================
-export function calcularTecido(mtsProntos: number) {
-  return +(mtsProntos * CONFIG.fatorTecido).toFixed(2);
+export function calcularTecido(mtsProntos: number, v: Vars = DEFAULT_VARS) {
+  return +(mtsProntos * v.fatorTecido).toFixed(2);
 }
-export function calcularForro(mtsProntos: number, temForro: boolean) {
-  return temForro ? +(mtsProntos * CONFIG.fatorTecido).toFixed(2) : 0;
+export function calcularForro(mtsProntos: number, temForro: boolean, v: Vars = DEFAULT_VARS) {
+  return temForro ? +(mtsProntos * v.fatorTecido).toFixed(2) : 0;
 }
-export function calcularBlackout(mtsProntos: number, temBlackout: boolean) {
-  return temBlackout ? +(mtsProntos * CONFIG.fatorTecido).toFixed(2) : 0;
+export function calcularBlackout(mtsProntos: number, temBlackout: boolean, v: Vars = DEFAULT_VARS) {
+  return temBlackout ? +(mtsProntos * v.fatorTecido).toFixed(2) : 0;
 }
-export function calcularEntretela(mtsProntos: number, tecidoBlackout: boolean) {
-  return tecidoBlackout ? 0 : +(mtsProntos * CONFIG.fatorEntretela).toFixed(2);
+export function calcularEntretela(mtsProntos: number, tecidoBlackout: boolean, v: Vars = DEFAULT_VARS) {
+  return tecidoBlackout ? 0 : +(mtsProntos * v.fatorEntretela).toFixed(2);
 }
-export function calcularCordao(modelo: Modelo, mtsProntos: number) {
-  return modelo === "Wave" ? +(mtsProntos * CONFIG.fatorCordao).toFixed(2) : 0;
+export function calcularCordao(modelo: Modelo, mtsProntos: number, v: Vars = DEFAULT_VARS) {
+  return modelo === "Wave" ? +(mtsProntos * v.fatorCordao).toFixed(2) : 0;
 }
-export function calcularRodizios(mtsProntos: number) {
-  return Math.ceil(mtsProntos * CONFIG.rodiziosPorMetro);
+export function calcularRodizios(mtsProntos: number, v: Vars = DEFAULT_VARS) {
+  return Math.ceil(mtsProntos * v.rodiziosPorMetro);
 }
-export function calcularMaoDeObra(mtsTecido: number) {
-  return mtsTecido * CONFIG.maoDeObraPorMetroTecido;
+export function calcularMaoDeObra(mtsTecido: number, v: Vars = DEFAULT_VARS) {
+  return mtsTecido * v.maoDeObraPorMetroTecido;
 }
-export function calcularAndaime(altura: number) {
-  return altura > CONFIG.andaimeAlturaMin ? CONFIG.andaimeValor : 0;
+export function calcularAndaime(altura: number, v: Vars = DEFAULT_VARS) {
+  return altura > v.andaimeAlturaMin ? v.andaimeValor : 0;
 }
-export function calcularInstalacao(instalar: boolean, comForro: boolean) {
+export function calcularInstalacao(instalar: boolean, comForro: boolean, v: Vars = DEFAULT_VARS) {
   if (!instalar) return 0;
-  return comForro ? CONFIG.instalacaoComForro : CONFIG.instalacaoSemForro;
+  return comForro ? v.instalacaoComForro : v.instalacaoSemForro;
 }
 
 /** Inferência automática do trilho */
@@ -218,27 +243,27 @@ export function inferirTrilho(opts: {
   return "Varão suíço";
 }
 
-export function calcularTrilho(mtsProntos: number, tipo: TrilhoTipo) {
-  const mts = mtsProntos * CONFIG.fatorTrilho;
+export function calcularTrilho(mtsProntos: number, tipo: TrilhoTipo, v: Vars = DEFAULT_VARS) {
+  const mts = mtsProntos * v.fatorTrilho;
   const preco =
     tipo === "Trilho duplo"
-      ? PRECOS.trilhoDuploPorMetro
+      ? v.trilhoDuploPorMetro
       : tipo === "Trilho simples"
-      ? PRECOS.trilhoSimplesPorMetro
-      : PRECOS.varaoSuicoPorMetro;
+      ? v.trilhoSimplesPorMetro
+      : v.varaoSuicoPorMetro;
   return { metros: +mts.toFixed(2), custo: mts * preco };
 }
 
-export function aplicarLucro(subtotal: number, instalacao: number, deslocamento: number, margemExtra = 0) {
-  return subtotal * (1 + CONFIG.lucro + margemExtra / 100) + instalacao + deslocamento;
+export function aplicarLucro(subtotal: number, instalacao: number, deslocamento: number, margemExtra = 0, v: Vars = DEFAULT_VARS) {
+  return subtotal * (1 + v.lucro + margemExtra / 100) + instalacao + deslocamento;
 }
 
-export function calcularParcelamento(total: number, forma: FormaPagamento, parcelas: number) {
+export function calcularParcelamento(total: number, forma: FormaPagamento, parcelas: number, v: Vars = DEFAULT_VARS) {
   let mult = 1;
   switch (forma) {
-    case "Pix": mult = 1 - CONFIG.descontoPix; break;
-    case "Cartão Crédito 1x": mult = 1 + CONFIG.jurosCredito1x; break;
-    case "Cartão Crédito Parcelado": mult = parcelas * CONFIG.jurosCartaoParcela + 1; break;
+    case "Pix": mult = 1 - v.descontoPix; break;
+    case "Cartão Crédito 1x": mult = 1 + v.jurosCredito1x; break;
+    case "Cartão Crédito Parcelado": mult = parcelas * v.jurosCartaoParcela + 1; break;
     default: mult = 1;
   }
   const totalPagamento = total * mult;
@@ -249,64 +274,106 @@ export function calcularParcelamento(total: number, forma: FormaPagamento, parce
 // ============================================================
 // ORQUESTRADOR
 // ============================================================
-export function calcular(input: PricingInput): CalcResult {
+export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
   const { medidas, estrutura, instalacao, comercial } = input;
 
-  const tecido = CATALOGO_TECIDOS.find((t) => t.codigo === estrutura.tecidoCodigo) ?? CATALOGO_TECIDOS[0];
+  const v: Vars = { ...DEFAULT_VARS, ...ctx.vars };
+  const tecidos = ctx.tecidos ?? CATALOGO_TECIDOS;
+  const forros = ctx.forros ?? CATALOGO_FORROS;
+  const blackouts = ctx.blackouts ?? CATALOGO_BLACKOUTS;
+
+  const tecido = tecidos.find((t) => t.codigo === estrutura.tecidoCodigo) ?? tecidos[0];
   const forro = estrutura.forroCodigo != null
-    ? CATALOGO_FORROS.find((t) => t.codigo === estrutura.forroCodigo) ?? null
+    ? forros.find((t) => t.codigo === estrutura.forroCodigo) ?? null
     : null;
   const blackout = estrutura.blackoutCodigo != null
-    ? CATALOGO_BLACKOUTS.find((t) => t.codigo === estrutura.blackoutCodigo) ?? null
+    ? blackouts.find((t) => t.codigo === estrutura.blackoutCodigo) ?? null
     : null;
 
-  const mtsProntos = Math.max(medidas.larguraCortina || medidas.larguraJanela, 0);
+  // Medidas base (Guia de Cálculo): L = largura a cobrir, H = altura.
+  const L = Math.max(medidas.larguraCortina || 0, 0);
+  const H = Math.max(medidas.alturaCortina || 0, 0);
+  const mtsProntos = L;
   const temForro = !!forro;
   const temBlackout = !!blackout;
 
-  // Composição técnica automática
-  const mtsTecido    = calcularTecido(mtsProntos);
-  const mtsForro     = calcularForro(mtsProntos, temForro);
-  const mtsBlackout  = calcularBlackout(mtsProntos, temBlackout);
-  const mtsEntretela = calcularEntretela(mtsProntos, !!tecido.blackout);
-  const mtsCordao    = calcularCordao(estrutura.modelo, mtsProntos);
-  const qtdRodizios  = calcularRodizios(mtsProntos);
+  // --- Metragem de tecido pelo método dos dois casos de corte ---
+  const alturaCorte = +(H + v.bainha).toFixed(2);          // bainha cima + baixo
+  const larguraFranzida = +(L * v.fatorTecido).toFixed(2); // caimento (×3)
+
+  let caso: "A" | "B";
+  let nPanos = 0;
+  let mtsTecido: number;
+  let sobraLateral = 0;
+
+  if (alturaCorte <= v.larguraUtilRolo) {
+    // Caso A — rolo "em pé": a altura cabe na largura do rolo. Compra pela largura.
+    caso = "A";
+    mtsTecido = larguraFranzida;
+  } else {
+    // Caso B — "virar o rolo": panos verticais emendados. Compra pela altura.
+    caso = "B";
+    nPanos = Math.max(1, Math.ceil((L * v.fatorTecido) / v.larguraRolo)); // = ⌈L⌉ nos padrões
+    mtsTecido = +(nPanos * alturaCorte).toFixed(2);
+    sobraLateral = +(nPanos * v.larguraRolo - larguraFranzida).toFixed(2);
+  }
+
+  // --- Forro ---
+  // Costurado junto (trilho simples): acompanha o tecido.
+  // Separado (trilho duplo): largura × 1,2.
+  const mtsForro = temForro
+    ? estrutura.costuraXForro ? mtsTecido : +(L * v.forroSeparadoFator).toFixed(2)
+    : 0;
+
+  // Blackout — sempre uma camada separada (trilho duplo): largura × 1,2.
+  const mtsBlackout = temBlackout ? +(L * v.forroSeparadoFator).toFixed(2) : 0;
+
+  // Entretela acompanha a largura franzida (zero se o próprio tecido é blackout).
+  const mtsEntretela = tecido && tecido.blackout ? 0 : larguraFranzida;
+
+  // Cordão (somente Wave) conforme o cabeçalho.
+  const mtsCordao = estrutura.modelo === "Wave" ? +(L * v.fatorCordao).toFixed(2) : 0;
+
+  // Presilhas/rodízios: qtd por metro × largura.
+  const qtdRodizios = Math.ceil(L * v.rodiziosPorMetro);
 
   const trilhoInferido = inferirTrilho({
     temBlackout, temForro,
     costuraXForro: estrutura.costuraXForro,
     motorizada: estrutura.motorizada,
   });
-  const trilho = calcularTrilho(mtsProntos, trilhoInferido);
+  // Trilho = largura da parede (× fator, padrão 1).
+  const trilho = calcularTrilho(L, trilhoInferido, v);
 
   // Custos
-  const custoTecido    = mtsTecido * tecido.precoMetro;
+  const custoTecido    = tecido ? mtsTecido * tecido.precoMetro : 0;
   const custoForro     = forro    ? mtsForro    * forro.precoMetro    : 0;
   const custoBlackout  = blackout ? mtsBlackout * blackout.precoMetro : 0;
-  const custoEntretela = mtsEntretela * PRECOS.entretelaPorMetro;
-  const custoCordao    = mtsCordao * PRECOS.cordaoWavePorMetro;
-  const custoRodizio   = qtdRodizios * PRECOS.rodizio;
+  const custoEntretela = mtsEntretela * v.entretelaPorMetro;
+  const custoCordao    = mtsCordao * v.cordaoWavePorMetro;
+  const custoRodizio   = qtdRodizios * v.rodizio;
   const custoTrilho    = trilho.custo;
-  const custoMaoObra   = calcularMaoDeObra(mtsTecido + mtsForro + mtsBlackout);
+  const custoMaoObra   = calcularMaoDeObra(mtsTecido + mtsForro + mtsBlackout, v);
 
   // Instalação
-  const custoAndaime = calcularAndaime(medidas.alturaCortina || medidas.alturaJanela);
-  const fatorDificuldade = instalacao.dificuldade === "Difícil" ? 1.4 : 1;
-  const custoInstalacao = calcularInstalacao(instalacao.instalar, temForro || temBlackout) * fatorDificuldade + custoAndaime;
+  const custoAndaime = calcularAndaime(H, v);
+  const fatorDificuldade = instalacao.dificuldade === "Difícil" ? v.fatorDificuldade : 1;
+  const custoInstalacao = calcularInstalacao(instalacao.instalar, temForro || temBlackout, v) * fatorDificuldade + custoAndaime;
   const custoDeslocamento = instalacao.deslocamento || 0;
 
   const subtotalProducao =
     custoTecido + custoForro + custoBlackout + custoMaoObra +
     custoRodizio + custoCordao + custoEntretela + custoTrilho;
 
-  const totalComLucro = aplicarLucro(subtotalProducao, custoInstalacao, custoDeslocamento, comercial.margemExtra);
+  const totalComLucro = aplicarLucro(subtotalProducao, custoInstalacao, custoDeslocamento, comercial.margemExtra, v);
   const descontoValor = totalComLucro * (comercial.desconto / 100);
   const totalFinal = totalComLucro - descontoValor;
 
-  const { totalPagamento, valorParcela } = calcularParcelamento(totalFinal, comercial.forma, comercial.parcelas);
+  const { totalPagamento, valorParcela } = calcularParcelamento(totalFinal, comercial.forma, comercial.parcelas, v);
 
   return {
-    mtsProntos, mtsTecido, mtsForro, mtsBlackout, mtsEntretela, mtsCordao,
+    mtsProntos, caso, alturaCorte, nPanos, larguraFranzida, sobraLateral,
+    mtsTecido, mtsForro, mtsBlackout, mtsEntretela, mtsCordao,
     qtdRodizios, mtsTrilho: trilho.metros, trilhoInferido,
     custoTecido, custoForro, custoBlackout, custoMaoObra, custoCordao,
     custoRodizio, custoEntretela, custoTrilho, custoAndaime,
@@ -325,10 +392,9 @@ export const formatBRL = (v: number) =>
   (isFinite(v) ? v : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export const defaultPricingInput = (): PricingInput => ({
-  ambiente: { cliente: "", ambiente: "Sala", observacoes: "" },
+  ambiente: { cliente: "", ambiente: "Sala de Estar", observacoes: "" },
   medidas: {
     larguraParede: 3.5, alturaParede: 2.8,
-    larguraJanela: 2.4, alturaJanela: 2.2,
     larguraCortina: 3.0, alturaCortina: 2.5,
   },
   estrutura: {

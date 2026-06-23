@@ -1,4 +1,4 @@
-import type { PricingInput, CalcResult } from "./pricing-engine";
+import { calcular, defaultPricingInput, type PricingInput, type CalcResult } from "./pricing-engine";
 
 export type ProposalStatus = "Rascunho" | "Enviado" | "Aprovado" | "Perdido";
 
@@ -24,12 +24,40 @@ export interface StockItem {
   minimo: number;
 }
 
+// Cada proposta de exemplo carrega input + result reais para que a tela da
+// Empresa e o PDF tenham conteúdo completo de imediato.
+function seedProposal(
+  id: string,
+  cliente: string,
+  ambiente: string,
+  status: ProposalStatus,
+  data: string,
+  over: (i: PricingInput) => void
+): Proposal {
+  const input = defaultPricingInput();
+  input.ambiente.cliente = cliente;
+  input.ambiente.ambiente = ambiente;
+  over(input);
+  const result = calcular(input);
+  return { id, cliente, ambiente, valor: result.totalFinal, status, data, input, result };
+}
+
 export const initialProposals: Proposal[] = [
-  { id: "p1", cliente: "Marina Albuquerque", ambiente: "Sala de Estar", valor: 6480, status: "Aprovado", data: "2026-05-12" },
-  { id: "p2", cliente: "Ricardo Mendes", ambiente: "Suíte Master", valor: 4250, status: "Enviado", data: "2026-05-15" },
-  { id: "p3", cliente: "Helena Castro", ambiente: "Home Office", valor: 2790, status: "Rascunho", data: "2026-05-17" },
-  { id: "p4", cliente: "Família Tavares", ambiente: "Sala de Jantar", valor: 9870, status: "Aprovado", data: "2026-05-09" },
-  { id: "p5", cliente: "Studio M&P", ambiente: "Showroom", valor: 18420, status: "Aprovado", data: "2026-05-02" },
+  seedProposal("p1", "Marina Albuquerque", "Sala de Estar", "Aprovado", "2026-05-12", (i) => {
+    i.medidas.larguraCortina = 4.2; i.medidas.alturaCortina = 2.8; i.estrutura.tecidoCodigo = 1130;
+  }),
+  seedProposal("p2", "Ricardo Mendes", "Suíte Master", "Enviado", "2026-05-15", (i) => {
+    i.medidas.larguraCortina = 3.0; i.medidas.alturaCortina = 2.6; i.estrutura.blackoutCodigo = 4681;
+  }),
+  seedProposal("p3", "Helena Castro", "Home Office", "Rascunho", "2026-05-17", (i) => {
+    i.medidas.larguraCortina = 2.2; i.medidas.alturaCortina = 2.4; i.estrutura.forroCodigo = null; i.estrutura.modelo = "Prega macho";
+  }),
+  seedProposal("p4", "Família Tavares", "Sala de Jantar", "Aprovado", "2026-05-09", (i) => {
+    i.medidas.larguraCortina = 5.0; i.medidas.alturaCortina = 3.0; i.estrutura.motorizada = true;
+  }),
+  seedProposal("p5", "Studio M&P", "Showroom", "Aprovado", "2026-05-02", (i) => {
+    i.medidas.larguraCortina = 7.5; i.medidas.alturaCortina = 4.8; i.estrutura.tecidoCodigo = 5001; i.comercial.margemExtra = 10;
+  }),
 ];
 
 // Estoque alinhado ao catálogo (códigos casam com pricing-engine)

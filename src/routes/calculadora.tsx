@@ -1,50 +1,32 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Save, ArrowRight, ArrowLeft, Check, Ruler, User2, Layers, Wrench, Wallet, AlertTriangle, Sparkles } from "lucide-react";
+import { Save, ArrowRight, ArrowLeft, Check, Ruler, User2, Layers, Wrench, Wallet, AlertTriangle, Minus, Plus } from "lucide-react";
 
-import { PageHeader, GoldButton, Field, inputCls, selectCls } from "@/components/ui-kit";
+import { PageHeader, GoldButton, Field, Switch, inputCls, selectCls } from "@/components/ui-kit";
 import {
   calcular,
   defaultPricingInput,
   formatBRL,
-  CATALOGO_TECIDOS,
-  CATALOGO_FORROS,
-  CATALOGO_BLACKOUTS,
   type PricingInput,
 } from "@/lib/pricing-engine";
-import { useStore, store } from "@/lib/store";
+import { useStore, store, useCalcCtx } from "@/lib/store";
 import { metrosDisponiveis } from "@/lib/mockData";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/calculadora")({ component: Calculadora });
 
 const STEPS = [
-  { key: "cliente",     label: "Cliente",     icon: User2 },
-  { key: "medidas",     label: "Medidas",     icon: Ruler },
-  { key: "estrutura",   label: "Estrutura",   icon: Layers },
-  { key: "composicao",  label: "Composição",  icon: Wrench },
-  { key: "comercial",   label: "Comercial",   icon: Wallet },
+  { key: "cliente",    label: "Cliente",    icon: User2 },
+  { key: "medidas",    label: "Medidas",    icon: Ruler },
+  { key: "estrutura",  label: "Estrutura",  icon: Layers },
+  { key: "instalacao", label: "Instalação", icon: Wrench },
+  { key: "fechamento", label: "Fechamento", icon: Wallet },
 ] as const;
 
 const AMBIENTES = [
-  "Sala de Estar",
-  "Sala de Jantar",
-  "Suíte Master",
-  "Suíte de Hóspedes",
-  "Closet",
-  "Home Theater",
-  "Home Office",
-  "Biblioteca",
-  "Lavabo",
-  "Cozinha Gourmet",
-  "Sala de Estar do Pavimento Superior",
-  "Varanda Gourmet",
-  "Sacada Panorâmica",
-  "Adega Climatizada",
-  "Spa & Sauna",
-  "Quadra / Salão de Jogos",
-  "Hall de Entrada",
-  "Showroom",
+  "Sala de Estar", "Sala de Jantar", "Suíte Master", "Suíte de Hóspedes", "Closet",
+  "Home Theater", "Home Office", "Biblioteca", "Lavabo", "Cozinha Gourmet",
+  "Varanda Gourmet", "Sacada Panorâmica", "Hall de Entrada", "Showroom",
 ];
 const MODELOS = ["Wave", "Prega macho", "Prega americana", "Persiana"] as const;
 const FORMAS = ["Pix", "Cartão Débito", "Cartão Crédito 1x", "Cartão Crédito Parcelado", "Dinheiro"] as const;
@@ -52,10 +34,15 @@ const FORMAS = ["Pix", "Cartão Débito", "Cartão Crédito 1x", "Cartão Crédi
 function Calculadora() {
   const navigate = useNavigate();
   const stock = useStore((s) => s.stock);
+  const tecidos = useStore((s) => s.tecidos);
+  const forros = useStore((s) => s.forros);
+  const blackouts = useStore((s) => s.blackouts);
+  const ctx = useCalcCtx();
+
   const [step, setStep] = useState(0);
   const [input, setInput] = useState<PricingInput>(defaultPricingInput());
 
-  const result = useMemo(() => calcular(input), [input]);
+  const result = useMemo(() => calcular(input, ctx), [input, ctx]);
 
   const estoqueTecido = metrosDisponiveis(stock, input.estrutura.tecidoCodigo);
   const estoqueForro = metrosDisponiveis(stock, input.estrutura.forroCodigo ?? undefined);
@@ -89,41 +76,62 @@ function Calculadora() {
     navigate({ to: "/registros" });
   };
 
+  const isLast = step === STEPS.length - 1;
+
   return (
     <>
       <PageHeader
-        eyebrow="Configurador"
+        eyebrow="Atendimento"
         title="Nova precificação"
-        subtitle="Conduza a visita em cinco passos. A composição técnica é gerada automaticamente."
+        subtitle="Conduza a visita em cinco passos simples. O preço é calculado em tempo real."
       />
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-10">
+      {/* Total fixo no mobile — o cliente vê o preço acompanhar as escolhas */}
+      <div className="xl:hidden sticky top-[57px] z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 mb-5 bg-[var(--background)]/90 backdrop-blur-md border-y border-white/[0.05] flex items-center justify-between">
+        <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Total estimado</div>
+        <div className="flex items-baseline gap-2">
+          <span key={result.totalFinal} className="text-[18px] font-medium stat animate-value">{formatBRL(result.totalFinal)}</span>
+          {input.comercial.parcelas > 1 && (
+            <span className="text-[11px] text-muted-foreground">{input.comercial.parcelas}× {formatBRL(result.valorParcela)}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-8">
         <div>
           <Stepper step={step} onPick={setStep} />
 
-          <div className="surface rounded-2xl p-8 mt-6 min-h-[440px]">
+          <div className="surface rounded-2xl p-5 sm:p-8 mt-5 sm:mt-6">
             <div key={step} className="animate-fade-in">
               {step === 0 && <StepCliente input={input} set={set} />}
-              {step === 1 && <StepMedidas input={input} set={set} />}
-              {step === 2 && <StepEstrutura input={input} set={set} alertaTecido={alertaTecido} alertaForro={alertaForro} estoqueTecido={estoqueTecido} estoqueForro={estoqueForro} />}
-              {step === 3 && <StepComposicao input={input} set={set} result={result} />}
-              {step === 4 && <StepComercial input={input} set={set} result={result} />}
+              {step === 1 && <StepMedidas input={input} set={set} result={result} />}
+              {step === 2 && (
+                <StepEstrutura
+                  input={input} set={set}
+                  tecidos={tecidos} forros={forros} blackouts={blackouts}
+                  alertaTecido={alertaTecido} alertaForro={alertaForro}
+                  estoqueTecido={estoqueTecido} estoqueForro={estoqueForro}
+                />
+              )}
+              {step === 3 && <StepInstalacao input={input} set={set} result={result} />}
+              {step === 4 && <StepFechamento input={input} set={set} result={result} />}
             </div>
 
-            <div className="flex items-center justify-between mt-10 pt-6 border-t border-white/[0.05]">
-              <GoldButton variant="ghost" onClick={prev} className={step === 0 ? "invisible" : ""}>
+            {/* Navegação */}
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-8 pt-6 border-t border-white/[0.05]">
+              <GoldButton variant="ghost" onClick={prev} className={`${step === 0 ? "sm:invisible hidden sm:inline-flex" : ""} justify-center`}>
                 <ArrowLeft className="w-3.5 h-3.5" /> Voltar
               </GoldButton>
-              <div className="flex gap-2">
-                <GoldButton variant="outline" onClick={() => salvar("Rascunho")}>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <GoldButton variant="outline" onClick={() => salvar("Rascunho")} className="justify-center">
                   <Save className="w-3.5 h-3.5" /> Salvar rascunho
                 </GoldButton>
-                {step < STEPS.length - 1 ? (
-                  <GoldButton onClick={next}>
+                {!isLast ? (
+                  <GoldButton onClick={next} className="justify-center">
                     Avançar <ArrowRight className="w-3.5 h-3.5" />
                   </GoldButton>
                 ) : (
-                  <GoldButton onClick={() => salvar("Enviado")}>
+                  <GoldButton onClick={() => salvar("Enviado")} className="justify-center">
                     Finalizar proposta <Check className="w-3.5 h-3.5" />
                   </GoldButton>
                 )}
@@ -132,45 +140,75 @@ function Calculadora() {
           </div>
         </div>
 
-        <ResumoLateral input={input} result={result} alerta={alertaTecido || alertaForro} />
+        <ResumoCliente input={input} result={result} alerta={alertaTecido || alertaForro} tecidos={tecidos} forros={forros} />
       </div>
     </>
   );
 }
 
 // =========================================================
-// STEPPER
+// STEPPER — responsivo
 // =========================================================
 function Stepper({ step, onPick }: { step: number; onPick: (i: number) => void }) {
+  const current = STEPS[step];
+  const Icon = current.icon;
   return (
-    <div className="flex items-center justify-between">
-      {STEPS.map((s, i) => {
-        const active = i === step;
-        const done = i < step;
-        const Icon = s.icon;
-        return (
-          <button key={s.key} onClick={() => onPick(i)} className="flex-1 flex items-center gap-3 group">
-            <div
-              className={`flex items-center justify-center w-8 h-8 rounded-full text-[11px] border transition-colors ${
-                active
-                  ? "border-[var(--gold)] text-gold bg-[oklch(0.80_0.10_88_/_0.06)]"
-                  : done
-                  ? "border-white/[0.12] text-foreground bg-white/[0.04]"
-                  : "border-white/[0.08] text-muted-foreground"
+    <div>
+      {/* Mobile: progresso compacto */}
+      <div className="md:hidden">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center justify-center w-9 h-9 rounded-full border border-[var(--gold)] text-gold bg-[oklch(0.80_0.10_88_/_0.06)]">
+            <Icon className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Etapa {step + 1} de {STEPS.length}</div>
+            <div className="text-[15px] font-medium tracking-tight">{current.label}</div>
+          </div>
+        </div>
+        <div className="flex gap-1.5">
+          {STEPS.map((s, i) => (
+            <button
+              key={s.key}
+              onClick={() => onPick(i)}
+              aria-label={s.label}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${
+                i <= step ? "bg-[var(--gold)]" : "bg-white/[0.08]"
               }`}
-            >
-              {done ? <Check className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
-            </div>
-            <div className="hidden md:block text-left">
-              <div className={`text-[10px] uppercase tracking-[0.16em] ${active ? "text-foreground" : "text-muted-foreground"}`}>
-                Etapa {i + 1}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Desktop: stepper completo */}
+      <div className="hidden md:flex items-center justify-between">
+        {STEPS.map((s, i) => {
+          const active = i === step;
+          const done = i < step;
+          const Ic = s.icon;
+          return (
+            <button key={s.key} onClick={() => onPick(i)} className="flex-1 flex items-center gap-3 group">
+              <div
+                className={`flex items-center justify-center w-8 h-8 rounded-full text-[11px] border transition-colors ${
+                  active
+                    ? "border-[var(--gold)] text-gold bg-[oklch(0.80_0.10_88_/_0.06)]"
+                    : done
+                    ? "border-white/[0.12] text-foreground bg-white/[0.04]"
+                    : "border-white/[0.08] text-muted-foreground"
+                }`}
+              >
+                {done ? <Check className="w-3.5 h-3.5" /> : <Ic className="w-3.5 h-3.5" />}
               </div>
-              <div className={`text-[12px] ${active ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</div>
-            </div>
-            {i < STEPS.length - 1 && <div className="flex-1 h-px bg-white/[0.05] mx-3" />}
-          </button>
-        );
-      })}
+              <div className="text-left">
+                <div className={`text-[10px] uppercase tracking-[0.16em] ${active ? "text-foreground" : "text-muted-foreground"}`}>
+                  Etapa {i + 1}
+                </div>
+                <div className={`text-[12px] ${active ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</div>
+              </div>
+              {i < STEPS.length - 1 && <div className="flex-1 h-px bg-white/[0.05] mx-3" />}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -239,32 +277,42 @@ function StepCliente({ input, set }: any) {
 }
 
 // =========================================================
-// STEP 2 — Medidas
+// STEP 2 — Medidas (sem janela)
 // =========================================================
-function StepMedidas({ input, set }: any) {
+function StepMedidas({ input, set, result }: any) {
   const m = input.medidas;
   return (
     <div>
       <StepTitle eyebrow="Etapa 2 · Medidas" title="Tome as medidas do ambiente" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
         <div>
-          <SubLabel>Parede</SubLabel>
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <SubLabel>Parede <span className="normal-case tracking-normal text-muted-foreground/70">(referência visual)</span></SubLabel>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-7">
             <NumField label="Largura" v={m.larguraParede} set={(v) => set("medidas", { larguraParede: v })} suf="m" />
             <NumField label="Altura" v={m.alturaParede} set={(v) => set("medidas", { alturaParede: v })} suf="m" />
           </div>
-          <SubLabel>Janela</SubLabel>
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <NumField label="Largura" v={m.larguraJanela} set={(v) => set("medidas", { larguraJanela: v })} suf="m" />
-            <NumField label="Altura" v={m.alturaJanela} set={(v) => set("medidas", { alturaJanela: v })} suf="m" />
-          </div>
-          <SubLabel>Cortina desejada</SubLabel>
-          <div className="grid grid-cols-2 gap-4">
+          <SubLabel>Cortina desejada <span className="normal-case tracking-normal text-gold/80">(dimensiona o orçamento)</span></SubLabel>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <NumField label="Largura" v={m.larguraCortina} set={(v) => set("medidas", { larguraCortina: v })} suf="m" />
             <NumField label="Altura" v={m.alturaCortina} set={(v) => set("medidas", { alturaCortina: v })} suf="m" />
           </div>
+
+          {/* Leitura do método de corte (Guia de Cálculo) */}
+          <div className="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Corte do tecido</span>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full ${result.caso === "B" ? "text-gold bg-[oklch(0.80_0.10_88_/_0.08)]" : "text-[oklch(0.78_0.10_150)] bg-[oklch(0.55_0.12_150_/_0.10)]"}`}>
+                {result.caso === "B" ? "Virar o rolo" : "Rolo em pé"}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+              <MiniInfo label="Altura de corte" value={`${result.alturaCorte.toFixed(2)} m`} />
+              <MiniInfo label="Tecido" value={`${result.mtsTecido.toFixed(2)} m`} />
+              <MiniInfo label={result.caso === "B" ? "Panos" : "Largura franzida"} value={result.caso === "B" ? `${result.nPanos}` : `${result.larguraFranzida.toFixed(2)} m`} />
+            </div>
+          </div>
         </div>
-        <div className="surface-flat rounded-xl p-6 flex items-center justify-center">
+        <div className="surface-flat rounded-xl p-6 flex items-center justify-center min-h-[220px]">
           <PreviewJanela {...m} />
         </div>
       </div>
@@ -277,22 +325,28 @@ function StepMedidas({ input, set }: any) {
   );
 }
 
-function PreviewJanela({ larguraParede, alturaParede, larguraJanela, alturaJanela, larguraCortina, alturaCortina }: any) {
+function MiniInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-[var(--background)] py-2.5 px-1">
+      <div className="text-[14px] font-medium stat">{value}</div>
+      <div className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+function PreviewJanela({ larguraParede, alturaParede, larguraCortina, alturaCortina }: any) {
   const scaleW = 240 / Math.max(larguraParede, larguraCortina, 0.1);
   const scaleH = 170 / Math.max(alturaParede, alturaCortina, 0.1);
   const scale = Math.min(scaleW, scaleH);
   const pW = larguraParede * scale;
   const pH = alturaParede * scale;
-  const jW = Math.min(larguraJanela, larguraParede) * scale;
-  const jH = Math.min(alturaJanela, alturaParede) * scale;
   const cW = Math.min(larguraCortina, larguraParede) * scale;
   const cH = Math.min(alturaCortina, alturaParede) * scale;
   return (
-    <svg width={pW + 60} height={pH + 60} className="overflow-visible">
+    <svg width={pW + 60} height={pH + 60} className="overflow-visible max-w-full">
       <rect x={30} y={30} width={pW} height={pH} fill="none" stroke="oklch(1 0 0 / 0.10)" strokeWidth={1} />
-      <rect x={30 + (pW - jW) / 2} y={30 + (pH - jH)} width={jW} height={jH} fill="oklch(1 0 0 / 0.03)" stroke="oklch(1 0 0 / 0.18)" strokeWidth={1} />
       {/* cortina prevista */}
-      <rect x={30 + (pW - cW) / 2} y={30 + (pH - cH)} width={cW} height={cH} fill="oklch(0.80 0.10 88 / 0.04)" stroke="oklch(0.80 0.10 88 / 0.45)" strokeDasharray="3 3" strokeWidth={1} />
+      <rect x={30 + (pW - cW) / 2} y={30 + (pH - cH)} width={cW} height={cH} fill="oklch(0.80 0.10 88 / 0.06)" stroke="oklch(0.80 0.10 88 / 0.5)" strokeWidth={1.2} />
       <text x={30 + pW / 2} y={20} fontSize={9} fill="oklch(0.62 0.012 260)" textAnchor="middle">parede {larguraParede}m</text>
       <text x={30 + pW / 2} y={30 + pH + 18} fontSize={9} fill="var(--gold)" textAnchor="middle">cortina {larguraCortina} × {alturaCortina}m</text>
     </svg>
@@ -300,9 +354,9 @@ function PreviewJanela({ larguraParede, alturaParede, larguraJanela, alturaJanel
 }
 
 // =========================================================
-// STEP 3 — Estrutura (sem perguntar trilho/perfil)
+// STEP 3 — Estrutura
 // =========================================================
-function StepEstrutura({ input, set, alertaTecido, alertaForro, estoqueTecido, estoqueForro }: any) {
+function StepEstrutura({ input, set, tecidos, forros, blackouts, alertaTecido, alertaForro, estoqueTecido, estoqueForro }: any) {
   const e = input.estrutura;
   return (
     <div>
@@ -313,30 +367,38 @@ function StepEstrutura({ input, set, alertaTecido, alertaForro, estoqueTecido, e
             {MODELOS.map((m) => <option key={m}>{m}</option>)}
           </select>
         </Field>
-        <Toggle label="Motorizada" hint="Acionamento elétrico" v={e.motorizada} set={(v) => set("estrutura", { motorizada: v })} />
+        <Field label="Motorizada" hint="Acionamento elétrico">
+          <div className="h-[42px] flex items-center">
+            <Switch checked={e.motorizada} onChange={(v) => set("estrutura", { motorizada: v })} label={e.motorizada ? "Sim" : "Não"} />
+          </div>
+        </Field>
 
         <Field label="Tecido principal" hint={alertaTecido ? `Estoque insuficiente · ${estoqueTecido}m disponíveis` : estoqueTecido != null ? `${estoqueTecido}m em estoque` : undefined}>
           <select className={`${selectCls} ${alertaTecido ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={e.tecidoCodigo} onChange={(ev) => set("estrutura", { tecidoCodigo: +ev.target.value })}>
-            {CATALOGO_TECIDOS.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
+            {tecidos.map((t: any) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
           </select>
         </Field>
 
         <Field label="Forro" hint={e.forroCodigo == null ? "Sem forro" : alertaForro ? `Estoque insuficiente · ${estoqueForro}m` : estoqueForro != null ? `${estoqueForro}m em estoque` : undefined}>
           <select className={`${selectCls} ${alertaForro ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={e.forroCodigo ?? "none"} onChange={(ev) => set("estrutura", { forroCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
             <option value="none">Sem forro</option>
-            {CATALOGO_FORROS.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
+            {forros.map((t: any) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
           </select>
         </Field>
 
         <Field label="Blackout" hint={e.blackoutCodigo == null ? "Sem blackout" : "Trilho duplo inferido"}>
           <select className={selectCls} value={e.blackoutCodigo ?? "none"} onChange={(ev) => set("estrutura", { blackoutCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
             <option value="none">Sem blackout</option>
-            {CATALOGO_BLACKOUTS.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
+            {blackouts.map((t: any) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
           </select>
         </Field>
 
         {e.forroCodigo != null && (
-          <Toggle label="Forro costurado junto" hint="Quando marcado, trilho permanece simples" v={e.costuraXForro} set={(v) => set("estrutura", { costuraXForro: v })} />
+          <Field label="Forro costurado junto" hint="Quando ativo, o trilho permanece simples">
+            <div className="h-[42px] flex items-center">
+              <Switch checked={e.costuraXForro} onChange={(v) => set("estrutura", { costuraXForro: v })} label={e.costuraXForro ? "Sim" : "Não"} />
+            </div>
+          </Field>
         )}
       </div>
     </div>
@@ -344,41 +406,65 @@ function StepEstrutura({ input, set, alertaTecido, alertaForro, estoqueTecido, e
 }
 
 // =========================================================
-// STEP 4 — Composição automática + Instalação
+// STEP 4 — Instalação
 // =========================================================
-function StepComposicao({ input, set, result }: any) {
+function StepInstalacao({ input, set }: any) {
   const i = input.instalacao;
   return (
     <div>
-      <StepTitle eyebrow="Etapa 4 · Composição" title="Necessidade técnica calculada" />
-      <div className="mt-2 text-[12px] text-muted-foreground flex items-center gap-2">
-        <Sparkles className="w-3 h-3 text-gold" />
-        Gerado automaticamente a partir das medidas e estrutura.
+      <StepTitle eyebrow="Etapa 4 · Instalação" title="Como será a instalação?" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-8">
+        <Field label="Instalar no local" hint="Inclui colocação">
+          <div className="h-[42px] flex items-center">
+            <Switch checked={i.instalar} onChange={(v) => set("instalacao", { instalar: v })} label={i.instalar ? "Sim" : "Não"} />
+          </div>
+        </Field>
+        <Field label="Dificuldade">
+          <select className={selectCls} value={i.dificuldade} onChange={(e) => set("instalacao", { dificuldade: e.target.value })} disabled={!i.instalar}>
+            <option>Padrão</option>
+            <option>Difícil</option>
+          </select>
+        </Field>
+        <NumField label="Deslocamento" v={i.deslocamento} set={(v) => set("instalacao", { deslocamento: v })} suf="R$" />
+      </div>
+    </div>
+  );
+}
+
+// =========================================================
+// STEP 5 — Fechamento (preço final ao cliente)
+// =========================================================
+function StepFechamento({ input, set, result }: any) {
+  const c = input.comercial;
+  return (
+    <div>
+      <StepTitle eyebrow="Etapa 5 · Fechamento" title="Condições e valor final" />
+
+      <div className="mt-8 rounded-2xl border border-[oklch(0.80_0.10_88_/_0.25)] bg-[oklch(0.80_0.10_88_/_0.04)] p-6 sm:p-7">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Investimento total</div>
+        <div key={result.totalFinal} className="text-[34px] sm:text-[40px] font-medium tracking-tight stat animate-value mt-1">{formatBRL(result.totalFinal)}</div>
+        {c.parcelas > 1 ? (
+          <div className="text-[13px] text-muted-foreground mt-1">
+            {c.forma} · {c.parcelas}× de <span className="text-gold stat">{formatBRL(result.valorParcela)}</span>
+          </div>
+        ) : (
+          <div className="text-[13px] text-muted-foreground mt-1">{c.forma}</div>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-white/[0.05] rounded-xl overflow-hidden mt-8">
-        <Tile label="Cortina pronta" value={`${result.mtsProntos.toFixed(2)} m`} />
-        <Tile label="Tecido" value={`${result.mtsTecido.toFixed(2)} m`} />
-        {result.mtsForro > 0 && <Tile label="Forro" value={`${result.mtsForro.toFixed(2)} m`} />}
-        {result.mtsBlackout > 0 && <Tile label="Blackout" value={`${result.mtsBlackout.toFixed(2)} m`} />}
-        {result.mtsEntretela > 0 && <Tile label="Entretela" value={`${result.mtsEntretela.toFixed(2)} m`} />}
-        {result.mtsCordao > 0 && <Tile label="Cordão Wave" value={`${result.mtsCordao.toFixed(2)} m`} />}
-        <Tile label="Rodízios" value={`${result.qtdRodizios} un`} />
-        <Tile label={result.trilhoInferido} value={`${result.mtsTrilho.toFixed(2)} m`} />
-        <Tile label="Mão de obra" value={formatBRL(result.custoMaoObra)} />
-      </div>
-
-      <div className="mt-10">
-        <SubLabel>Instalação</SubLabel>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-          <Toggle label="Instalar no local" hint="Inclui colocação" v={i.instalar} set={(v) => set("instalacao", { instalar: v })} />
-          <Field label="Dificuldade">
-            <select className={selectCls} value={i.dificuldade} onChange={(e) => set("instalacao", { dificuldade: e.target.value })}>
-              <option>Padrão</option>
-              <option>Difícil</option>
-            </select>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-7">
+        <Field label="Forma de pagamento">
+          <select className={selectCls} value={c.forma} onChange={(e) => set("comercial", { forma: e.target.value })}>
+            {FORMAS.map((f) => <option key={f}>{f}</option>)}
+          </select>
+        </Field>
+        <Field label="Parcelas">
+          <input type="number" inputMode="numeric" min={1} max={18} className={inputCls} value={c.parcelas} onChange={(e) => set("comercial", { parcelas: Math.max(1, +e.target.value) })} />
+        </Field>
+        <div className="md:col-span-2">
+          <Field label={`Desconto · ${c.desconto}%`} hint="Negociado com o cliente">
+            <input type="range" min={0} max={20} step={1} className="w-full accent-[var(--gold)]" value={c.desconto} onChange={(e) => set("comercial", { desconto: +e.target.value })} />
           </Field>
-          <NumField label="Deslocamento (R$)" v={i.deslocamento} set={(v) => set("instalacao", { deslocamento: v })} />
         </div>
       </div>
     </div>
@@ -386,78 +472,34 @@ function StepComposicao({ input, set, result }: any) {
 }
 
 // =========================================================
-// STEP 5 — Comercial
+// RESUMO LATERAL — visão do cliente (sem custos/margem)
 // =========================================================
-function StepComercial({ input, set, result }: any) {
-  const c = input.comercial;
+function ResumoCliente({ input, result, alerta, tecidos, forros }: any) {
+  const tecido = tecidos.find((t: any) => t.codigo === input.estrutura.tecidoCodigo);
+  const forro = input.estrutura.forroCodigo != null ? forros.find((t: any) => t.codigo === input.estrutura.forroCodigo) : null;
   return (
-    <div>
-      <StepTitle eyebrow="Etapa 5 · Comercial" title="Condições de pagamento" />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8">
-        <Field label="Forma de pagamento">
-          <select className={selectCls} value={c.forma} onChange={(e) => set("comercial", { forma: e.target.value })}>
-            {FORMAS.map((f) => <option key={f}>{f}</option>)}
-          </select>
-        </Field>
-        <Field label="Parcelas">
-          <input type="number" min={1} max={18} className={inputCls} value={c.parcelas} onChange={(e) => set("comercial", { parcelas: +e.target.value })} />
-        </Field>
-        <Field label={`Margem extra · ${c.margemExtra}%`} hint="Adicional sobre o lucro base de 30%">
-          <input type="range" min={0} max={30} step={1} className="w-full accent-[var(--gold)]" value={c.margemExtra} onChange={(e) => set("comercial", { margemExtra: +e.target.value })} />
-        </Field>
-        <Field label={`Desconto · ${c.desconto}%`}>
-          <input type="range" min={0} max={20} step={1} className="w-full accent-[var(--gold)]" value={c.desconto} onChange={(e) => set("comercial", { desconto: +e.target.value })} />
-        </Field>
-      </div>
-
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <SummaryStat label="Total à vista" value={formatBRL(result.totalFinal)} />
-        <SummaryStat label={c.parcelas > 1 ? `${c.parcelas}× de` : "Pagamento"} value={formatBRL(result.valorParcela)} />
-        <SummaryStat label="Total no pagamento" value={formatBRL(result.totalPagamento)} accent />
-      </div>
-    </div>
-  );
-}
-
-// =========================================================
-// RESUMO LATERAL
-// =========================================================
-function ResumoLateral({ input, result, alerta }: any) {
-  return (
-    <div className="xl:sticky xl:top-6 self-start space-y-3">
+    <div className="hidden xl:block xl:sticky xl:top-6 self-start space-y-3">
       <div className="surface rounded-2xl p-6">
         <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Resumo</div>
-        <div className="text-[13px] mt-2">{input.ambiente.cliente || "Novo cliente"}</div>
+        <div className="text-[14px] mt-2 font-medium">{input.ambiente.cliente || "Novo cliente"}</div>
         <div className="text-[11px] text-muted-foreground">{input.ambiente.ambiente}</div>
 
         <div className="hairline my-5" />
 
-        <SectionTitle>Necessidade técnica</SectionTitle>
-        <Row k="Cortina pronta" v={`${result.mtsProntos.toFixed(2)} m`} />
-        <Row k="Tecido" v={`${result.mtsTecido.toFixed(2)} m`} />
-        {result.mtsForro > 0 && <Row k="Forro" v={`${result.mtsForro.toFixed(2)} m`} />}
-        {result.mtsBlackout > 0 && <Row k="Blackout" v={`${result.mtsBlackout.toFixed(2)} m`} />}
-        <Row k="Rodízios" v={`${result.qtdRodizios} un`} />
-        <Row k={result.trilhoInferido} v={`${result.mtsTrilho.toFixed(2)} m`} />
-
-        <div className="hairline my-5" />
-
-        <SectionTitle>Composição</SectionTitle>
-        <Row k="Tecido" v={formatBRL(result.custoTecido)} muted />
-        {result.custoForro > 0 && <Row k="Forro" v={formatBRL(result.custoForro)} muted />}
-        {result.custoBlackout > 0 && <Row k="Blackout" v={formatBRL(result.custoBlackout)} muted />}
-        <Row k="Mão de obra" v={formatBRL(result.custoMaoObra)} muted />
-        <Row k="Trilho" v={formatBRL(result.custoTrilho)} muted />
-        {result.custoCordao > 0 && <Row k="Cordão" v={formatBRL(result.custoCordao)} muted />}
-        <Row k="Rodízios" v={formatBRL(result.custoRodizio)} muted />
-        {result.custoEntretela > 0 && <Row k="Entretela" v={formatBRL(result.custoEntretela)} muted />}
-        {result.custoInstalacao > 0 && <Row k="Instalação" v={formatBRL(result.custoInstalacao)} muted />}
+        <SectionTitle>Especificação</SectionTitle>
+        <Row k="Modelo" v={input.estrutura.modelo} />
+        <Row k="Tecido" v={tecido?.nome ?? "—"} />
+        <Row k="Forro" v={forro?.nome ?? "Sem forro"} />
+        {input.estrutura.blackoutCodigo != null && <Row k="Blackout" v="Sim" />}
+        <Row k="Trilho" v={result.trilhoInferido} />
+        <Row k="Medidas" v={`${input.medidas.larguraCortina} × ${input.medidas.alturaCortina} m`} />
+        <Row k="Instalação" v={input.instalacao.instalar ? "Inclusa" : "Não inclusa"} />
 
         <div className="hairline my-5" />
 
         <div className="flex items-baseline justify-between">
           <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Total</div>
-          <div key={result.totalFinal} className="text-[18px] font-medium tracking-tight stat animate-value">{formatBRL(result.totalFinal)}</div>
+          <div key={result.totalFinal} className="text-[20px] font-medium tracking-tight stat animate-value">{formatBRL(result.totalFinal)}</div>
         </div>
         {input.comercial.parcelas > 1 && (
           <div className="text-[11px] text-muted-foreground mt-1 text-right">
@@ -485,7 +527,7 @@ function StepTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{eyebrow}</div>
-      <div className="text-[18px] font-medium tracking-tight mt-2">{title}</div>
+      <div className="text-[17px] sm:text-[18px] font-medium tracking-tight mt-2">{title}</div>
     </div>
   );
 }
@@ -495,54 +537,50 @@ function SubLabel({ children }: { children: React.ReactNode }) {
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2.5">{children}</div>;
 }
-function Row({ k, v, muted }: { k: string; v: string; muted?: boolean }) {
+function Row({ k, v }: { k: string; v: string }) {
   return (
-    <div className={`flex justify-between text-[12px] py-1 ${muted ? "text-muted-foreground" : ""}`}>
-      <span>{k}</span>
-      <span className="stat text-foreground">{v}</span>
+    <div className="flex justify-between gap-4 text-[12px] py-1">
+      <span className="text-muted-foreground shrink-0">{k}</span>
+      <span className="stat text-foreground text-right truncate">{v}</span>
     </div>
   );
 }
-function Tile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-[var(--background)] p-5">
-      <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
-      <div className="text-[16px] font-medium tracking-tight mt-2 stat">{value}</div>
-    </div>
-  );
-}
+
+// Campo numérico com botões -/+ (ótimo para toque no mobile)
 function NumField({ label, v, set, suf }: { label: string; v: number; set: (n: number) => void; suf?: string }) {
+  const step = suf === "m" ? 0.1 : 10;
+  const dec = (n: number) => Math.round(n * 100) / 100;
   return (
     <Field label={label}>
-      <div className="relative">
-        <input type="number" step="0.01" className={inputCls} value={v} onChange={(e) => set(+e.target.value)} />
-        {suf && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">{suf}</span>}
+      <div className="flex items-stretch gap-1.5">
+        <button
+          type="button"
+          onClick={() => set(dec(Math.max(0, v - step)))}
+          className="w-10 shrink-0 rounded-md border border-white/[0.06] bg-white/[0.03] text-muted-foreground hover:text-foreground active:scale-95 transition flex items-center justify-center"
+          aria-label="Diminuir"
+        >
+          <Minus className="w-3.5 h-3.5" />
+        </button>
+        <div className="relative flex-1">
+          <input
+            type="number"
+            inputMode="decimal"
+            step={step}
+            className={`${inputCls} text-center ${suf ? "pr-7" : ""}`}
+            value={v}
+            onChange={(e) => set(+e.target.value)}
+          />
+          {suf && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">{suf}</span>}
+        </div>
+        <button
+          type="button"
+          onClick={() => set(dec(v + step))}
+          className="w-10 shrink-0 rounded-md border border-white/[0.06] bg-white/[0.03] text-muted-foreground hover:text-foreground active:scale-95 transition flex items-center justify-center"
+          aria-label="Aumentar"
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </button>
       </div>
     </Field>
-  );
-}
-function Toggle({ label, hint, v, set }: { label: string; hint?: string; v: boolean; set: (b: boolean) => void }) {
-  return (
-    <Field label={label} hint={hint}>
-      <button
-        type="button"
-        onClick={() => set(!v)}
-        className={`w-full text-left px-3 py-2.5 rounded-md border text-[12px] transition-colors ${
-          v
-            ? "border-[oklch(0.80_0.10_88_/_0.35)] bg-[oklch(0.80_0.10_88_/_0.05)] text-gold"
-            : "border-white/[0.06] bg-white/[0.03] text-muted-foreground hover:text-foreground"
-        }`}
-      >
-        {v ? "Sim" : "Não"}
-      </button>
-    </Field>
-  );
-}
-function SummaryStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className={`rounded-xl p-4 border ${accent ? "border-[oklch(0.80_0.10_88_/_0.3)] bg-[oklch(0.80_0.10_88_/_0.04)]" : "border-white/[0.06] bg-white/[0.02]"}`}>
-      <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
-      <div className={`text-[16px] font-medium mt-2 stat ${accent ? "text-gold" : ""}`}>{value}</div>
-    </div>
   );
 }

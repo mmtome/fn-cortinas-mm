@@ -1,4 +1,5 @@
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { X } from "lucide-react";
 
 export function PageHeader({
   eyebrow,
@@ -169,6 +170,94 @@ export function Select({
       >
         {children}
       </select>
+    </div>
+  );
+}
+
+// Switch — toggle on/off acessível e com boa área de toque.
+export function Switch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="inline-flex items-center gap-3 select-none btn-press"
+    >
+      <span
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 ease-premium ${
+          checked ? "bg-[var(--gold)]" : "bg-white/[0.10]"
+        }`}
+      >
+        <span
+          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ease-premium ${
+            checked ? "translate-x-[22px]" : "translate-x-[2px]"
+          }`}
+        />
+      </span>
+      {label && <span className="text-[13px]">{label}</span>}
+    </button>
+  );
+}
+
+// Modal — diálogo central no desktop, bottom-sheet no mobile.
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  footer,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+        onClick={onClose}
+      />
+      <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto surface-flat rounded-t-2xl sm:rounded-2xl border border-white/[0.08] shadow-2xl animate-fade-in">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.05] sticky top-0 bg-[var(--navy-deep)]/95 backdrop-blur-md z-10">
+          <h3 className="text-[15px] font-medium tracking-tight">{title}</h3>
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="px-6 py-5">{children}</div>
+        {footer && (
+          <div className="px-6 py-4 border-t border-white/[0.05] flex justify-end gap-2 sticky bottom-0 bg-[var(--navy-deep)]/95 backdrop-blur-md">
+            {footer}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
