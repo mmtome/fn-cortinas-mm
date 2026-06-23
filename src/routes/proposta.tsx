@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Download, Save, Building2, SlidersHorizontal } from "lucide-react";
+import { Download, Save, Building2, SlidersHorizontal, Home } from "lucide-react";
 import jsPDF from "jspdf";
 
 import { PageHeader, Card, GoldButton, Field, selectCls, inputCls, formatDate } from "@/components/ui-kit";
 import { useStore, store, useCalcCtx } from "@/lib/store";
-import { calcular, formatBRL, type Tecido, type PricingInput, type CalcResult } from "@/lib/pricing-engine";
+import { calcularProposta, formatBRL, type Tecido, type ComercialInput, type PropostaResult } from "@/lib/pricing-engine";
+import type { ComodoData } from "@/lib/mockData";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/proposta")({
@@ -30,45 +31,36 @@ function Proposta() {
   const proposals = useStore((s) => s.proposals);
   const tecidos = useStore((s) => s.tecidos);
   const forros = useStore((s) => s.forros);
-  const blackouts = useStore((s) => s.blackouts);
   const empresa = useStore((s) => s.empresa);
   const ctx = useCalcCtx();
 
   const [selectedId, setSelectedId] = useState(id || proposals[0]?.id || "");
   const proposal = useMemo(() => proposals.find((p) => p.id === selectedId), [proposals, selectedId]);
 
-  // Ajustes comerciais editáveis pela empresa (margem/desconto/pagamento)
-  const [comercial, setComercial] = useState(proposal?.input?.comercial);
-  useEffect(() => {
-    setComercial(proposal?.input?.comercial);
-  }, [proposal?.id]);
+  const [comercial, setComercial] = useState<ComercialInput | undefined>(proposal?.comercial);
+  useEffect(() => { setComercial(proposal?.comercial); }, [proposal?.id]);
 
-  // Recalcula com o input da proposta + ajustes atuais + variáveis vigentes
-  const input: PricingInput | undefined = useMemo(() => {
-    if (!proposal?.input) return undefined;
-    return { ...proposal.input, comercial: comercial ?? proposal.input.comercial };
-  }, [proposal, comercial]);
-
-  const res: CalcResult | undefined = useMemo(
-    () => (input ? calcular(input, ctx) : proposal?.result),
-    [input, ctx, proposal]
+  const comodos = proposal?.comodos ?? [];
+  const res: PropostaResult | undefined = useMemo(
+    () => (proposal && comodos.length ? calcularProposta(comodos, comercial ?? proposal.comercial, ctx) : undefined),
+    [proposal, comodos, comercial, ctx]
   );
 
   const validadeISO = proposal ? addDaysISO(proposal.data, 15) : "";
-  const cfg = input;
 
-  const setC = (patch: Partial<NonNullable<typeof comercial>>) =>
-    setComercial((c) => ({ ...(c ?? proposal!.input!.comercial), ...patch }));
+  const setC = (patch: Partial<ComercialInput>) =>
+    setComercial((c) => ({ ...(c ?? proposal!.comercial), ...patch }));
 
   const salvarAjustes = () => {
-    if (!proposal || !input || !res) return;
-    store.upsertProposal({ ...proposal, input, result: res, valor: res.totalFinal });
+    if (!proposal || !res || !comercial) return;
+    const novosComodos: ComodoData[] = proposal.comodos.map((c, i) => ({ ...c, result: res.comodos[i] }));
+    store.upsertProposal({ ...proposal, comercial, comodos: novosComodos, valor: res.totalFinal });
     toast.success("Ajustes salvos na proposta");
   };
 
   const baixarPDF = () => {
-    if (!proposal || !cfg || !res) return;
-    gerarPDF({ proposal, cfg, res, empresa, validadeISO, tecidos, forros, blackouts });
+    if (!proposal || !res || !comercial) return;
+    gerarPDF({ proposal, comodos, res, comercial, empresa, validadeISO, tecidos, forros });
   };
 
   return (
@@ -76,16 +68,12 @@ function Proposta() {
       <PageHeader
         eyebrow="Empresa · Documento comercial"
         title="Propostas"
-        subtitle="Confira custos, ajuste margem e desconto, e gere o PDF para o cliente."
+        subtitle="Confira custos por cômodo, ajuste margem e desconto, e gere o PDF para o cliente."
         actions={
-          proposal && (
+          proposal && res && (
             <div className="hidden sm:flex gap-2">
-              <GoldButton variant="outline" onClick={salvarAjustes}>
-                <Save className="w-3.5 h-3.5" /> Salvar ajustes
-              </GoldButton>
-              <GoldButton onClick={baixarPDF}>
-                <Download className="w-3.5 h-3.5" /> Baixar PDF
-              </GoldButton>
+              <GoldButton variant="outline" onClick={salvarAjustes}><Save className="w-3.5 h-3.5" /> Salvar ajustes</GoldButton>
+              <GoldButton onClick={baixarPDF}><Download className="w-3.5 h-3.5" /> Baixar PDF</GoldButton>
             </div>
           )
         }
@@ -100,36 +88,27 @@ function Proposta() {
               <button
                 key={p.id}
                 onClick={() => setSelectedId(p.id)}
-                className={`text-left px-3 py-3 rounded-md transition-colors shrink-0 lg:w-full min-w-[180px] ${
-                  selectedId === p.id ? "bg-white/[0.05]" : "hover:bg-white/[0.025]"
-                }`}
+                className={`text-left px-3 py-3 rounded-md transition-colors shrink-0 lg:w-full min-w-[180px] ${selectedId === p.id ? "bg-white/[0.05]" : "hover:bg-white/[0.025]"}`}
               >
                 <div className="text-[13px] font-medium truncate">{p.cliente}</div>
                 <div className="text-[11px] text-muted-foreground mt-0.5 truncate">{p.ambiente}</div>
                 <div className="text-[12px] text-gold mt-1 stat">{formatBRL(p.valor)}</div>
               </button>
             ))}
-            {proposals.length === 0 && (
-              <div className="text-[12px] text-muted-foreground">Nenhuma proposta ainda.</div>
-            )}
+            {proposals.length === 0 && <div className="text-[12px] text-muted-foreground">Nenhuma proposta ainda.</div>}
           </div>
         </div>
 
-        {proposal && cfg && res ? (
+        {proposal && res && comercial ? (
           <div className="space-y-6">
-            {/* Painel interno da empresa: custos + ajustes */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <BreakdownEmpresa res={res} />
-              <AjustesComercial comercial={comercial!} setC={setC} res={res} onSalvar={salvarAjustes} onPDF={baixarPDF} />
+              <BreakdownEmpresa res={res} comodos={comodos} tecidos={tecidos} />
+              <AjustesComercial comercial={comercial} setC={setC} res={res} onSalvar={salvarAjustes} onPDF={baixarPDF} />
             </div>
 
-            {/* Pré-visualização do documento do cliente */}
             <div>
               <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground mb-3">Pré-visualização do PDF</div>
-              <DocumentoPreview
-                proposal={proposal} cfg={cfg} res={res} empresa={empresa} validadeISO={validadeISO}
-                tecidos={tecidos} forros={forros}
-              />
+              <DocumentoPreview proposal={proposal} comodos={comodos} res={res} comercial={comercial} empresa={empresa} validadeISO={validadeISO} tecidos={tecidos} forros={forros} />
             </div>
           </div>
         ) : proposal ? (
@@ -146,9 +125,9 @@ function Proposta() {
 }
 
 // =========================================================
-// Breakdown interno (custos) — só a empresa vê
+// Breakdown interno (custos por cômodo) — só a empresa vê
 // =========================================================
-function BreakdownEmpresa({ res }: { res: CalcResult }) {
+function BreakdownEmpresa({ res, comodos, tecidos }: { res: PropostaResult; comodos: ComodoData[]; tecidos: Tecido[] }) {
   return (
     <div className="surface rounded-2xl p-6">
       <div className="flex items-center justify-between gap-2 mb-5">
@@ -161,40 +140,43 @@ function BreakdownEmpresa({ res }: { res: CalcResult }) {
         </span>
       </div>
 
-      <Sec>Necessidade técnica</Sec>
-      <KV k="Método de corte" v={res.caso === "B" ? "Virar o rolo (B)" : "Rolo em pé (A)"} />
-      <KV k="Altura de corte" v={`${res.alturaCorte.toFixed(2)} m`} />
-      {res.caso === "B" && <KV k="Nº de panos" v={`${res.nPanos}`} />}
-      <KV k="Largura franzida" v={`${res.larguraFranzida.toFixed(2)} m`} />
-      {res.caso === "B" && res.sobraLateral > 0 && <KV k="Sobra lateral" v={`${res.sobraLateral.toFixed(2)} m`} />}
-      <KV k="Tecido a comprar" v={`${res.mtsTecido.toFixed(2)} m`} />
-      {res.mtsForro > 0 && <KV k="Forro" v={`${res.mtsForro.toFixed(2)} m`} />}
-      {res.mtsBlackout > 0 && <KV k="Blackout" v={`${res.mtsBlackout.toFixed(2)} m`} />}
-      {res.mtsEntretela > 0 && <KV k="Entretela" v={`${res.mtsEntretela.toFixed(2)} m`} />}
-      <KV k="Rodízios" v={`${res.qtdRodizios} un`} />
-      <KV k={res.trilhoInferido} v={`${res.mtsTrilho.toFixed(2)} m`} />
+      <div className="space-y-3">
+        {comodos.map((c, i) => {
+          const r = res.comodos[i];
+          return (
+            <div key={i} className="rounded-xl bg-white/[0.02] border border-white/[0.05] p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Home className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-[12px] font-medium truncate">{c.ambiente}</span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full shrink-0 ${r.caso === "B" ? "text-gold bg-[oklch(0.80_0.10_88_/_0.08)]" : "text-[oklch(0.78_0.10_150)] bg-[oklch(0.55_0.12_150_/_0.10)]"}`}>
+                    {r.caso === "B" ? `${r.nPanos} panos` : "em pé"}
+                  </span>
+                </div>
+                <span className="text-[13px] stat text-gold shrink-0">{formatBRL(r.totalFinal)}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-2.5 text-[11px] text-muted-foreground">
+                <Cell k="Tecido" v={`${r.mtsTecido.toFixed(2)} m`} />
+                <Cell k={nome(tecidos, c.estrutura.tecidoCodigo).split(" ").slice(0, 2).join(" ")} v={formatBRL(r.custoTecido)} />
+                <Cell k="Mão de obra" v={formatBRL(r.custoMaoObra)} />
+                {r.sobraLateral > 0 && <Cell k="Sobra lateral" v={`${r.sobraLateral.toFixed(2)} m`} />}
+                <Cell k="Produção" v={formatBRL(r.subtotalProducao)} />
+                {r.custoInstalacao > 0 && <Cell k="Instalação" v={formatBRL(r.custoInstalacao)} />}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       <div className="hairline my-4" />
-
-      <Sec>Custos</Sec>
-      <KV k="Tecido" v={formatBRL(res.custoTecido)} muted />
-      {res.custoForro > 0 && <KV k="Forro" v={formatBRL(res.custoForro)} muted />}
-      {res.custoBlackout > 0 && <KV k="Blackout" v={formatBRL(res.custoBlackout)} muted />}
-      <KV k="Mão de obra" v={formatBRL(res.custoMaoObra)} muted />
-      <KV k="Trilho" v={formatBRL(res.custoTrilho)} muted />
-      {res.custoCordao > 0 && <KV k="Cordão" v={formatBRL(res.custoCordao)} muted />}
-      <KV k="Rodízios" v={formatBRL(res.custoRodizio)} muted />
-      {res.custoEntretela > 0 && <KV k="Entretela" v={formatBRL(res.custoEntretela)} muted />}
-      {res.custoInstalacao > 0 && <KV k="Instalação" v={formatBRL(res.custoInstalacao)} muted />}
-
-      <div className="hairline my-4" />
-      <KV k="Subtotal produção" v={formatBRL(res.subtotalProducao)} />
-      <div className="flex items-baseline justify-between mt-3">
+      <KV k="Subtotal produção" v={formatBRL(res.subtotalProducao)} muted />
+      {res.descontoValor > 0 && <KV k="Desconto" v={`− ${formatBRL(res.descontoValor)}`} muted />}
+      <div className="flex items-baseline justify-between mt-2">
         <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Total final</span>
         <span className="text-[18px] font-medium stat text-gold">{formatBRL(res.totalFinal)}</span>
       </div>
       <div className="text-[11px] text-muted-foreground mt-1 text-right">
-        Margem bruta: {formatBRL(res.totalFinal - res.subtotalProducao - res.custoInstalacao - res.custoDeslocamento)}
+        Margem bruta aprox.: {formatBRL(res.totalFinal - res.subtotalProducao)}
       </div>
     </div>
   );
@@ -212,7 +194,7 @@ function AjustesComercial({ comercial, setC, res, onSalvar, onPDF }: any) {
       </div>
 
       <div className="space-y-5">
-        <Field label={`Margem extra · ${comercial.margemExtra}%`} hint="Sobre o lucro base">
+        <Field label={`Margem extra · ${comercial.margemExtra}%`} hint="Sobre o lucro base, em todos os cômodos">
           <input type="range" min={0} max={40} step={1} className="w-full accent-[var(--gold)]" value={comercial.margemExtra} onChange={(e) => setC({ margemExtra: +e.target.value })} />
         </Field>
         <Field label={`Desconto · ${comercial.desconto}%`}>
@@ -240,12 +222,8 @@ function AjustesComercial({ comercial, setC, res, onSalvar, onPDF }: any) {
       )}
 
       <div className="flex gap-2 mt-5">
-        <GoldButton variant="outline" onClick={onSalvar} className="flex-1 justify-center">
-          <Save className="w-3.5 h-3.5" /> Salvar
-        </GoldButton>
-        <GoldButton onClick={onPDF} className="flex-1 justify-center">
-          <Download className="w-3.5 h-3.5" /> PDF
-        </GoldButton>
+        <GoldButton variant="outline" onClick={onSalvar} className="flex-1 justify-center"><Save className="w-3.5 h-3.5" /> Salvar</GoldButton>
+        <GoldButton onClick={onPDF} className="flex-1 justify-center"><Download className="w-3.5 h-3.5" /> PDF</GoldButton>
       </div>
     </div>
   );
@@ -254,7 +232,7 @@ function AjustesComercial({ comercial, setC, res, onSalvar, onPDF }: any) {
 // =========================================================
 // Pré-visualização do documento (espelha o PDF)
 // =========================================================
-function DocumentoPreview({ proposal, cfg, res, empresa, validadeISO, tecidos, forros }: any) {
+function DocumentoPreview({ proposal, comodos, res, comercial, empresa, validadeISO, tecidos, forros }: any) {
   return (
     <div className="rounded-2xl overflow-hidden border border-white/[0.05] max-w-2xl">
       {/* Capa */}
@@ -266,7 +244,7 @@ function DocumentoPreview({ proposal, cfg, res, empresa, validadeISO, tecidos, f
         <div className="w-12 h-px bg-[oklch(0.80_0.10_88_/_0.6)] mt-7 mb-7" />
         <div className="text-[12px] text-muted-foreground space-y-1.5">
           <div className="text-foreground">{proposal.cliente}</div>
-          <div>{proposal.ambiente}</div>
+          <div>{comodos.length} {comodos.length > 1 ? "cômodos" : "cômodo"}</div>
           <div>{formatDate(proposal.data)}</div>
         </div>
       </div>
@@ -276,22 +254,33 @@ function DocumentoPreview({ proposal, cfg, res, empresa, validadeISO, tecidos, f
         <div className="text-[10px] uppercase tracking-[0.18em] opacity-60 mb-2">Detalhamento</div>
         <div className="text-[20px] font-medium tracking-tight mb-8">{proposal.cliente}</div>
 
-        <dl className="grid grid-cols-[120px_1fr] sm:grid-cols-[140px_1fr] gap-y-3 gap-x-6 text-[13px] mb-8">
-          <Spec k="Modelo" v={cfg.estrutura.modelo} />
-          <Spec k="Tecido" v={nome(tecidos, cfg.estrutura.tecidoCodigo)} />
-          <Spec k="Forro" v={nome(forros, cfg.estrutura.forroCodigo, "Sem forro")} />
-          <Spec k="Trilho" v={res.trilhoInferido} />
-          <Spec k="Medidas" v={`${res.larguraCortina} × ${cfg.medidas.alturaParede} m`} />
-          <Spec k="Instalação" v={cfg.instalacao.instalar ? `Inclusa · ${cfg.instalacao.dificuldade}` : "Não inclusa"} />
-        </dl>
-
-        <div className="h-px bg-[var(--navy-deep)] opacity-10 mb-6" />
+        <div className="space-y-4 mb-8">
+          {comodos.map((c: ComodoData, i: number) => {
+            const r = res.comodos[i];
+            return (
+              <div key={i} className="border-t border-[var(--navy-deep)]/10 pt-4">
+                <div className="flex items-baseline justify-between gap-3 mb-2">
+                  <div className="text-[14px] font-medium">{c.ambiente}</div>
+                  <div className="text-[14px] stat">{formatBRL(r.totalFinal)}</div>
+                </div>
+                <dl className="grid grid-cols-[110px_1fr] sm:grid-cols-[130px_1fr] gap-y-1.5 gap-x-5 text-[12px]">
+                  <Spec k="Modelo" v={c.estrutura.modelo} />
+                  <Spec k="Tecido" v={nome(tecidos, c.estrutura.tecidoCodigo)} />
+                  <Spec k="Forro" v={nome(forros, c.estrutura.forroCodigo, "Sem forro")} />
+                  <Spec k="Trilho" v={r.trilhoInferido} />
+                  <Spec k="Medidas" v={`${r.larguraCortina} × ${c.medidas.alturaParede} m`} />
+                  <Spec k="Instalação" v={c.instalacao.instalar ? `Inclusa · ${c.instalacao.dificuldade}` : "Não inclusa"} />
+                </dl>
+              </div>
+            );
+          })}
+        </div>
 
         <div className="rounded-xl bg-[var(--navy-deep)] text-[var(--champagne)] px-6 py-5 flex items-center justify-between">
           <div>
             <div className="text-[10px] uppercase tracking-[0.18em] text-gold">Investimento total</div>
             <div className="text-[12px] opacity-70 mt-1">
-              {cfg.comercial.parcelas > 1 ? `${cfg.comercial.forma} · ${cfg.comercial.parcelas}× de ${formatBRL(res.valorParcela)}` : cfg.comercial.forma}
+              {comercial.parcelas > 1 ? `${comercial.forma} · ${comercial.parcelas}× de ${formatBRL(res.valorParcela)}` : comercial.forma}
             </div>
           </div>
           <div className="text-[26px] font-medium tracking-tight stat">{formatBRL(res.totalFinal)}</div>
@@ -327,8 +316,13 @@ function Spec({ k, v }: { k: string; v: string }) {
     </>
   );
 }
-function Sec({ children }: { children: React.ReactNode }) {
-  return <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2.5">{children}</div>;
+function Cell({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="stat text-foreground text-[12px] truncate">{v}</div>
+      <div className="truncate opacity-70">{k}</div>
+    </div>
+  );
 }
 function KV({ k, v, muted }: { k: string; v: string; muted?: boolean }) {
   return (
@@ -340,15 +334,14 @@ function KV({ k, v, muted }: { k: string; v: string; muted?: boolean }) {
 }
 
 // =========================================================
-// GERAÇÃO DO PDF — design refinado
+// GERAÇÃO DO PDF — capa + cômodos + total combinado
 // =========================================================
-function gerarPDF({ proposal, cfg, res, empresa, validadeISO, tecidos, forros }: any) {
+function gerarPDF({ proposal, comodos, res, comercial, empresa, validadeISO, tecidos, forros }: any) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const w = doc.internal.pageSize.getWidth();
   const h = doc.internal.pageSize.getHeight();
-  const M = 56; // margem
+  const M = 56;
 
-  // Paleta
   const navy: [number, number, number] = [20, 26, 48];
   const gold: [number, number, number] = [201, 168, 76];
   const cream: [number, number, number] = [250, 247, 240];
@@ -357,139 +350,101 @@ function gerarPDF({ proposal, cfg, res, empresa, validadeISO, tecidos, forros }:
 
   const contatos = [empresa.telefone, empresa.instagram, empresa.email, empresa.site].filter(Boolean);
 
-  // ============ PÁGINA 1 — CAPA ============
-  doc.setFillColor(...navy);
-  doc.rect(0, 0, w, h, "F");
-
-  // Moldura dourada fina
-  doc.setDrawColor(...gold);
-  doc.setLineWidth(0.6);
+  // ============ CAPA ============
+  doc.setFillColor(...navy); doc.rect(0, 0, w, h, "F");
+  doc.setDrawColor(...gold); doc.setLineWidth(0.6);
   doc.rect(M - 18, M - 18, w - 2 * (M - 18), h - 2 * (M - 18));
-
-  // Marca
-  doc.setFillColor(...gold);
-  doc.rect(M, M + 6, 34, 2, "F");
-  doc.setTextColor(...gold);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFillColor(...gold); doc.rect(M, M + 6, 34, 2, "F");
+  doc.setTextColor(...gold); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
   doc.text(empresa.nome.toUpperCase() + "  ·  ATELIER", M, M + 30);
-
-  // Título central
-  doc.setTextColor(238, 232, 217);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(46);
+  doc.setTextColor(238, 232, 217); doc.setFont("helvetica", "normal"); doc.setFontSize(46);
   doc.text("Proposta", M, h / 2 - 14);
   doc.text("Comercial", M, h / 2 + 34);
+  doc.setDrawColor(...gold); doc.setLineWidth(0.5); doc.line(M, h / 2 + 62, M + 70, h / 2 + 62);
+  doc.setTextColor(206, 200, 184); doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+  doc.text(proposal.cliente, M, h / 2 + 96);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(168, 162, 148);
+  doc.text(`${comodos.length} ${comodos.length > 1 ? "cômodos" : "cômodo"}`, M, h / 2 + 114);
+  doc.text(new Date(proposal.data).toLocaleDateString("pt-BR"), M, h / 2 + 130);
+  doc.setTextColor(150, 144, 128); doc.setFontSize(8.5);
+  doc.text(empresa.slogan || "Cortinas e persianas sob medida", M, h - M);
+  if (contatos.length) { doc.setTextColor(...gold); doc.text(contatos.join("   ·   "), M, h - M + 16); }
 
-  doc.setDrawColor(...gold);
-  doc.setLineWidth(0.5);
-  doc.line(M, h / 2 + 62, M + 70, h / 2 + 62);
+  // ============ DETALHAMENTO ============
+  const headerPagina = () => {
+    doc.setFillColor(...cream); doc.rect(0, 0, w, h, "F");
+    doc.setFillColor(...navy); doc.rect(M, M, 4, 34, "F");
+    doc.setTextColor(...navy); doc.setFont("helvetica", "bold"); doc.setFontSize(8.5);
+    doc.text(empresa.nome.toUpperCase(), M + 16, M + 13);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(15);
+    doc.text("Detalhamento da proposta", M + 16, M + 32);
+  };
+
+  doc.addPage();
+  headerPagina();
+  let y = M + 70;
 
   // Cliente
-  doc.setTextColor(206, 200, 184);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.text(proposal.cliente, M, h / 2 + 96);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(168, 162, 148);
-  doc.text(proposal.ambiente, M, h / 2 + 114);
-  doc.text(new Date(proposal.data).toLocaleDateString("pt-BR"), M, h / 2 + 130);
+  doc.setTextColor(...soft); doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+  doc.text("CLIENTE", M, y);
+  doc.setTextColor(...navy); doc.setFontSize(14); doc.text(proposal.cliente, M, y + 18);
+  y += 44;
 
-  // Rodapé capa
-  doc.setTextColor(150, 144, 128);
-  doc.setFontSize(8.5);
-  doc.text(empresa.slogan || "Cortinas e persianas sob medida", M, h - M);
-  if (contatos.length) {
-    doc.setTextColor(...gold);
-    doc.text(contatos.join("   ·   "), M, h - M + 16);
-  }
+  const ensure = (need: number) => {
+    if (y + need > h - M - 40) { doc.addPage(); headerPagina(); y = M + 70; }
+  };
 
-  // ============ PÁGINA 2 — DETALHAMENTO ============
-  doc.addPage();
-  doc.setFillColor(...cream);
-  doc.rect(0, 0, w, h, "F");
+  // Cômodos
+  comodos.forEach((c: ComodoData, i: number) => {
+    const r = res.comodos[i];
+    ensure(132);
 
-  // Cabeçalho
-  doc.setFillColor(...navy);
-  doc.rect(M, M, 4, 34, "F");
-  doc.setTextColor(...navy);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.text(empresa.nome.toUpperCase(), M + 16, M + 13);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(15);
-  doc.text("Detalhamento da proposta", M + 16, M + 32);
+    doc.setDrawColor(...gold); doc.setLineWidth(0.4); doc.line(M, y, w - M, y); y += 20;
+    // Título + valor
+    doc.setTextColor(...navy); doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+    doc.text(`${i + 1}.  ${c.ambiente}`, M, y);
+    doc.setFontSize(13); doc.text(formatBRL(r.totalFinal), w - M, y, { align: "right" });
+    y += 20;
 
-  let y = M + 78;
-
-  // Cliente / Ambiente
-  block(doc, "CLIENTE", proposal.cliente, M, y, soft, navy);
-  block(doc, "AMBIENTE", proposal.ambiente, w / 2, y, soft, navy);
-  y += 52;
-  rule(doc, y, M, w, gold); y += 30;
-
-  // Especificações
-  doc.setTextColor(...soft);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.text("ESPECIFICAÇÕES", M, y); y += 20;
-
-  const linhas: [string, string][] = [
-    ["Modelo", cfg.estrutura.modelo],
-    ["Tecido", nome(tecidos, cfg.estrutura.tecidoCodigo)],
-    ["Forro", nome(forros, cfg.estrutura.forroCodigo, "Sem forro")],
-    ["Acionamento", cfg.estrutura.motorizada ? "Motorizada" : "Manual"],
-    ["Trilho", res.trilhoInferido],
-    ["Medidas da cortina", `${res.larguraCortina} × ${cfg.medidas.alturaParede} m`],
-    ["Instalação", cfg.instalacao.instalar ? `Inclusa · ${cfg.instalacao.dificuldade}` : "Não inclusa"],
-  ];
-  doc.setFontSize(10.5);
-  linhas.forEach(([k, v], i) => {
-    if (i % 2 === 1) { doc.setFillColor(243, 238, 228); doc.rect(M - 8, y - 11, w - 2 * M + 16, 22, "F"); }
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...soft);
-    doc.text(k, M, y + 4);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...ink);
-    doc.text(String(v), M + 180, y + 4);
-    y += 24;
+    const linhas: [string, string][] = [
+      ["Modelo", c.estrutura.modelo],
+      ["Tecido", nome(tecidos, c.estrutura.tecidoCodigo)],
+      ["Forro", nome(forros, c.estrutura.forroCodigo, "Sem forro")],
+      ["Trilho", r.trilhoInferido],
+      ["Medidas da cortina", `${r.larguraCortina} × ${c.medidas.alturaParede} m`],
+      ["Instalação", c.instalacao.instalar ? `Inclusa · ${c.instalacao.dificuldade}` : "Não inclusa"],
+    ];
+    doc.setFontSize(10);
+    linhas.forEach(([k, v], idx) => {
+      if (idx % 2 === 1) { doc.setFillColor(243, 238, 228); doc.rect(M - 8, y - 10, w - 2 * M + 16, 20, "F"); }
+      doc.setFont("helvetica", "normal"); doc.setTextColor(...soft); doc.text(k, M, y + 4);
+      doc.setFont("helvetica", "bold"); doc.setTextColor(...ink); doc.text(String(v), M + 170, y + 4);
+      y += 21;
+    });
+    y += 10;
   });
 
-  y += 16;
-
-  // Bloco de investimento (navy)
+  // Total combinado
+  ensure(150);
   const boxH = 96;
-  doc.setFillColor(...navy);
-  doc.roundedRect(M, y, w - 2 * M, boxH, 10, 10, "F");
-  doc.setFillColor(...gold);
-  doc.roundedRect(M, y, 3, boxH, 2, 2, "F");
-  doc.setTextColor(...gold);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.text("INVESTIMENTO TOTAL", M + 22, y + 28);
-  doc.setTextColor(245, 239, 222);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(28);
-  doc.text(formatBRL(res.totalFinal), M + 22, y + 62);
-  doc.setTextColor(176, 168, 146);
-  doc.setFontSize(9.5);
+  doc.setFillColor(...navy); doc.roundedRect(M, y, w - 2 * M, boxH, 10, 10, "F");
+  doc.setFillColor(...gold); doc.roundedRect(M, y, 3, boxH, 2, 2, "F");
+  doc.setTextColor(...gold); doc.setFont("helvetica", "bold"); doc.setFontSize(8.5);
+  doc.text("INVESTIMENTO TOTAL", M + 22, y + 26);
+  doc.setTextColor(245, 239, 222); doc.setFont("helvetica", "normal"); doc.setFontSize(28);
+  doc.text(formatBRL(res.totalFinal), M + 22, y + 60);
+  doc.setTextColor(176, 168, 146); doc.setFontSize(9.5);
   doc.text(
-    cfg.comercial.parcelas > 1
-      ? `${cfg.comercial.forma}  ·  ${cfg.comercial.parcelas}× de ${formatBRL(res.valorParcela)}`
-      : cfg.comercial.forma,
+    comercial.parcelas > 1 ? `${comercial.forma}  ·  ${comercial.parcelas}× de ${formatBRL(res.valorParcela)}` : comercial.forma,
     M + 22, y + 82
   );
-  y += boxH + 34;
+  y += boxH + 30;
 
   // Condições
-  doc.setTextColor(...soft);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
+  ensure(110);
+  doc.setTextColor(...soft); doc.setFont("helvetica", "bold"); doc.setFontSize(8.5);
   doc.text("CONDIÇÕES COMERCIAIS", M, y); y += 18;
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(72, 72, 84);
-  doc.setFontSize(9.5);
+  doc.setFont("helvetica", "normal"); doc.setTextColor(72, 72, 84); doc.setFontSize(9.5);
   [
     `Validade da proposta: ${formatDate(validadeISO)}`,
     "Pagamento: 50% de sinal e 50% na entrega",
@@ -497,35 +452,14 @@ function gerarPDF({ proposal, cfg, res, empresa, validadeISO, tecidos, forros }:
     "Garantia: 12 meses para tecidos e mecanismos",
   ].forEach((c) => { doc.text(`·   ${c}`, M, y); y += 16; });
 
-  // Rodapé com contatos
-  doc.setDrawColor(...gold);
-  doc.setLineWidth(0.5);
-  doc.line(M, h - M - 18, M + 50, h - M - 18);
-  doc.setTextColor(...navy);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  // Rodapé
+  doc.setDrawColor(...gold); doc.setLineWidth(0.5); doc.line(M, h - M - 18, M + 50, h - M - 18);
+  doc.setTextColor(...navy); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
   doc.text(`${empresa.nome} — Atelier`, M, h - M);
   if (contatos.length) {
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...soft);
-    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "normal"); doc.setTextColor(...soft); doc.setFontSize(8.5);
     doc.text(contatos.join("   ·   "), M, h - M + 14);
   }
 
   doc.save(`Proposta-${proposal.cliente.replace(/\s+/g, "-")}.pdf`);
-}
-
-function block(doc: any, label: string, value: string, x: number, y: number, soft: number[], navy: number[]) {
-  doc.setTextColor(soft[0], soft[1], soft[2]);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.text(label, x, y);
-  doc.setTextColor(navy[0], navy[1], navy[2]);
-  doc.setFontSize(14);
-  doc.text(value, x, y + 20);
-}
-function rule(doc: any, y: number, M: number, w: number, gold: number[]) {
-  doc.setDrawColor(gold[0], gold[1], gold[2]);
-  doc.setLineWidth(0.4);
-  doc.line(M, y, w - M, y);
 }

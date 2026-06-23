@@ -401,6 +401,73 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
 export const formatBRL = (v: number) =>
   (isFinite(v) ? v : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+// ============================================================
+// MÚLTIPLOS CÔMODOS NA MESMA PROPOSTA
+// Cada cômodo tem medidas/estrutura/instalação próprias. Cliente e
+// condições comerciais (pagamento/desconto/margem) são da proposta.
+// ============================================================
+export interface ComodoInput {
+  ambiente: string;
+  observacoes?: string;
+  medidas: MedidasInput;
+  estrutura: EstruturaInput;
+  instalacao: InstalacaoInput;
+}
+
+export interface PropostaResult {
+  comodos: CalcResult[];      // resultado de cada cômodo (sem desconto/pagamento)
+  subtotalProducao: number;
+  totalComLucro: number;      // soma dos cômodos (já com lucro/margem e instalação)
+  descontoValor: number;
+  totalFinal: number;
+  totalPagamento: number;
+  valorParcela: number;
+}
+
+export function defaultComodo(): ComodoInput {
+  const base = defaultPricingInput();
+  return {
+    ambiente: "Sala de Estar",
+    observacoes: "",
+    medidas: base.medidas,
+    estrutura: base.estrutura,
+    instalacao: base.instalacao,
+  };
+}
+
+/** Calcula um cômodo isolado: usa a margem da proposta, sem desconto/pagamento. */
+export function calcularComodo(c: ComodoInput, comercial: ComercialInput, ctx: CalcCtx = {}): CalcResult {
+  return calcular(
+    {
+      ambiente: { cliente: "", ambiente: c.ambiente, observacoes: c.observacoes },
+      medidas: c.medidas,
+      estrutura: c.estrutura,
+      instalacao: c.instalacao,
+      comercial: { ...comercial, desconto: 0, forma: "Dinheiro", parcelas: 1 },
+    },
+    ctx
+  );
+}
+
+/** Agrega todos os cômodos e aplica desconto + pagamento uma única vez. */
+export function calcularProposta(comodos: ComodoInput[], comercial: ComercialInput, ctx: CalcCtx = {}): PropostaResult {
+  const v: Vars = { ...DEFAULT_VARS, ...ctx.vars };
+  const results = comodos.map((c) => calcularComodo(c, comercial, ctx));
+  const subtotalProducao = results.reduce((a, r) => a + r.subtotalProducao, 0);
+  const totalComLucro = results.reduce((a, r) => a + r.totalComLucro, 0);
+  const descontoValor = totalComLucro * (comercial.desconto / 100);
+  const totalFinal = totalComLucro - descontoValor;
+  const { totalPagamento, valorParcela } = calcularParcelamento(totalFinal, comercial.forma, comercial.parcelas, v);
+  return { comodos: results, subtotalProducao, totalComLucro, descontoValor, totalFinal, totalPagamento, valorParcela };
+}
+
+/** Rótulo curto de exibição para a lista de cômodos. */
+export function ambienteLabel(comodos: { ambiente: string }[]): string {
+  if (comodos.length === 0) return "—";
+  if (comodos.length === 1) return comodos[0].ambiente;
+  return `${comodos[0].ambiente} +${comodos.length - 1}`;
+}
+
 export const defaultPricingInput = (): PricingInput => ({
   ambiente: { cliente: "", ambiente: "Sala de Estar", observacoes: "" },
   medidas: {

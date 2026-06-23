@@ -1,16 +1,30 @@
-import { calcular, defaultPricingInput, type PricingInput, type CalcResult } from "./pricing-engine";
+import {
+  calcularComodo,
+  calcularProposta,
+  defaultComodo,
+  defaultPricingInput,
+  ambienteLabel,
+  type ComodoInput,
+  type ComercialInput,
+  type CalcResult,
+} from "./pricing-engine";
 
 export type ProposalStatus = "Rascunho" | "Enviado" | "Aprovado" | "Perdido";
+
+/** Um cômodo já calculado, guardado na proposta. */
+export interface ComodoData extends ComodoInput {
+  result: CalcResult;
+}
 
 export interface Proposal {
   id: string;
   cliente: string;
-  ambiente: string;
-  valor: number;
+  comodos: ComodoData[];      // 1 ou mais cômodos no mesmo orçamento
+  comercial: ComercialInput;  // condições da proposta inteira
+  valor: number;              // total final agregado
   status: ProposalStatus;
   data: string;
-  input?: PricingInput;
-  result?: CalcResult;
+  ambiente: string;           // rótulo derivado (ex.: "Sala +2")
 }
 
 export interface StockItem {
@@ -24,40 +38,48 @@ export interface StockItem {
   minimo: number;
 }
 
-// Cada proposta de exemplo carrega input + result reais para que a tela da
+// Cada proposta de exemplo carrega cômodos + result reais para que a tela da
 // Empresa e o PDF tenham conteúdo completo de imediato.
+type ComodoSpec = { ambiente: string; over: (c: ComodoInput) => void };
+
 function seedProposal(
   id: string,
   cliente: string,
-  ambiente: string,
   status: ProposalStatus,
   data: string,
-  over: (i: PricingInput) => void
+  specs: ComodoSpec[],
+  comercialOver?: Partial<ComercialInput>
 ): Proposal {
-  const input = defaultPricingInput();
-  input.ambiente.cliente = cliente;
-  input.ambiente.ambiente = ambiente;
-  over(input);
-  const result = calcular(input);
-  return { id, cliente, ambiente, valor: result.totalFinal, status, data, input, result };
+  const comercial: ComercialInput = { ...defaultPricingInput().comercial, ...comercialOver };
+  const comodos: ComodoData[] = specs.map((s) => {
+    const c = defaultComodo();
+    c.ambiente = s.ambiente;
+    s.over(c);
+    return { ...c, result: calcularComodo(c, comercial) };
+  });
+  const valor = calcularProposta(comodos, comercial).totalFinal;
+  return { id, cliente, comodos, comercial, valor, status, data, ambiente: ambienteLabel(comodos) };
 }
 
 export const initialProposals: Proposal[] = [
-  seedProposal("p1", "Marina Albuquerque", "Sala de Estar", "Aprovado", "2026-05-12", (i) => {
-    i.medidas.larguraParede = 4.2; i.medidas.alturaParede = 2.8; i.estrutura.tecidoCodigo = 1130;
-  }),
-  seedProposal("p2", "Ricardo Mendes", "Suíte Master", "Enviado", "2026-05-15", (i) => {
-    i.medidas.larguraParede = 3.0; i.medidas.alturaParede = 2.6; i.estrutura.blackoutCodigo = 4681;
-  }),
-  seedProposal("p3", "Helena Castro", "Home Office", "Rascunho", "2026-05-17", (i) => {
-    i.medidas.larguraParede = 2.2; i.medidas.alturaParede = 2.4; i.estrutura.forroCodigo = null; i.estrutura.modelo = "Prega macho";
-  }),
-  seedProposal("p4", "Família Tavares", "Sala de Jantar", "Aprovado", "2026-05-09", (i) => {
-    i.medidas.larguraParede = 5.0; i.medidas.alturaParede = 3.0; i.estrutura.motorizada = true;
-  }),
-  seedProposal("p5", "Studio M&P", "Showroom", "Aprovado", "2026-05-02", (i) => {
-    i.medidas.larguraParede = 7.5; i.medidas.alturaParede = 4.8; i.estrutura.tecidoCodigo = 5001; i.comercial.margemExtra = 10;
-  }),
+  seedProposal("p1", "Marina Albuquerque", "Aprovado", "2026-05-12", [
+    { ambiente: "Sala de Estar", over: (c) => { c.medidas.larguraParede = 4.2; c.medidas.alturaParede = 2.8; c.estrutura.tecidoCodigo = 1130; } },
+  ]),
+  seedProposal("p2", "Ricardo Mendes", "Enviado", "2026-05-15", [
+    { ambiente: "Suíte Master", over: (c) => { c.medidas.larguraParede = 3.0; c.medidas.alturaParede = 2.6; c.estrutura.blackoutCodigo = 4681; } },
+  ]),
+  seedProposal("p3", "Helena Castro", "Rascunho", "2026-05-17", [
+    { ambiente: "Home Office", over: (c) => { c.medidas.larguraParede = 2.2; c.medidas.alturaParede = 2.4; c.estrutura.forroCodigo = null; c.estrutura.modelo = "Prega macho"; } },
+  ]),
+  // Proposta com vários cômodos no mesmo orçamento
+  seedProposal("p4", "Família Tavares", "Aprovado", "2026-05-09", [
+    { ambiente: "Sala de Jantar", over: (c) => { c.medidas.larguraParede = 5.0; c.medidas.alturaParede = 3.0; c.estrutura.motorizada = true; } },
+    { ambiente: "Sala de Estar", over: (c) => { c.medidas.larguraParede = 4.0; c.medidas.alturaParede = 2.8; } },
+    { ambiente: "Suíte Master", over: (c) => { c.medidas.larguraParede = 3.2; c.medidas.alturaParede = 2.6; c.estrutura.blackoutCodigo = 4681; } },
+  ]),
+  seedProposal("p5", "Studio M&P", "Aprovado", "2026-05-02", [
+    { ambiente: "Showroom", over: (c) => { c.medidas.larguraParede = 7.5; c.medidas.alturaParede = 4.8; c.estrutura.tecidoCodigo = 5001; } },
+  ], { margemExtra: 10 }),
 ];
 
 // Estoque alinhado ao catálogo (códigos casam com pricing-engine)

@@ -1,5 +1,6 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { initialProposals, initialStock, type Proposal, type StockItem } from "./mockData";
+import { ambienteLabel } from "./pricing-engine";
 import {
   CATALOGO_TECIDOS,
   CATALOGO_FORROS,
@@ -68,6 +69,37 @@ function persist() {
   }
 }
 
+/** Converte propostas no formato antigo (input/result único) para comodos[]. */
+function migrateProposal(p: any): Proposal {
+  if (p && Array.isArray(p.comodos)) return p as Proposal;
+  const input = p?.input;
+  if (input) {
+    const med = input.medidas ?? {};
+    const medidas = {
+      larguraParede: med.larguraParede ?? med.larguraCortina ?? 3,
+      alturaParede: med.alturaParede ?? med.alturaCortina ?? 2.5,
+    };
+    const comodo = {
+      ambiente: input.ambiente?.ambiente ?? p.ambiente ?? "Ambiente",
+      observacoes: input.ambiente?.observacoes ?? "",
+      medidas,
+      estrutura: input.estrutura,
+      instalacao: input.instalacao,
+      result: p.result,
+    };
+    return {
+      id: p.id, cliente: p.cliente, comodos: [comodo], comercial: input.comercial,
+      valor: p.valor, status: p.status, data: p.data, ambiente: ambienteLabel([comodo]),
+    };
+  }
+  // Proposta antiga sem detalhamento — mantém cabeçalho, sem cômodos.
+  return {
+    id: p.id, cliente: p.cliente, comodos: [],
+    comercial: { desconto: 0, margemExtra: 0, forma: "Pix", parcelas: 1 },
+    valor: p.valor ?? 0, status: p.status, data: p.data, ambiente: p.ambiente ?? "—",
+  };
+}
+
 let hydrated = false;
 /** Carrega o estado salvo no navegador. Chamado uma vez no client (pós-hydration). */
 function hydrate() {
@@ -82,7 +114,7 @@ function hydrate() {
     const saved = JSON.parse(raw) as Partial<State>;
     const base = defaultState();
     state = {
-      proposals: saved.proposals ?? base.proposals,
+      proposals: saved.proposals ? saved.proposals.map(migrateProposal) : base.proposals,
       stock: saved.stock ?? base.stock,
       tecidos: saved.tecidos ?? base.tecidos,
       forros: saved.forros ?? base.forros,
