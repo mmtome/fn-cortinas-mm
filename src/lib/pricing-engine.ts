@@ -35,7 +35,8 @@ export const DEFAULT_VARS = {
   // Corte do tecido (rolo) — base do Guia de Cálculo
   larguraRolo: 3.0,        // largura do rolo de tecido (m)
   larguraUtilRolo: 2.85,   // largura útil — limite entre Caso A e Caso B
-  bainha: 0.35,            // somada à altura (bainha de cima + de baixo)
+  bainhaLimite: 0.15,      // dobra mínima usável — usada só para decidir A/B
+  bainha: 0.35,            // bainha cheia (cima + baixo) — usada na metragem do Caso B
   forroSeparadoFator: 1.2, // forro não costurado junto: largura × 1,2
 
   // Multiplicadores por metro de cortina pronta
@@ -298,23 +299,28 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
   const temBlackout = !!blackout;
 
   // --- Metragem de tecido pelo método dos dois casos de corte ---
-  const alturaCorte = +(H + v.bainha).toFixed(2);          // bainha cima + baixo
   const larguraFranzida = +(L * v.fatorTecido).toFixed(2); // caimento (×3)
+  // Decisão A/B usa a dobra mínima (ainda usável). A bainha cheia entra só na metragem do Caso B.
+  const alturaCorteLimite = +(H + v.bainhaLimite).toFixed(2);
+  const alturaCorteFinal = +(H + v.bainha).toFixed(2);
 
   let caso: "A" | "B";
   let nPanos = 0;
   let mtsTecido: number;
   let sobraLateral = 0;
+  let alturaCorte: number;
 
-  if (alturaCorte <= v.larguraUtilRolo) {
-    // Caso A — rolo "em pé": a altura cabe na largura do rolo. Compra pela largura.
+  if (alturaCorteLimite <= v.larguraUtilRolo) {
+    // Caso A — rolo "em pé": cabe na largura útil com a dobra mínima. Compra pela largura.
     caso = "A";
+    alturaCorte = alturaCorteLimite;
     mtsTecido = larguraFranzida;
   } else {
-    // Caso B — "virar o rolo": panos verticais emendados. Compra pela altura.
+    // Caso B — "virar o rolo": há comprimento de sobra, então usa a bainha cheia.
     caso = "B";
+    alturaCorte = alturaCorteFinal;
     nPanos = Math.max(1, Math.ceil((L * v.fatorTecido) / v.larguraRolo)); // = ⌈L⌉ nos padrões
-    mtsTecido = +(nPanos * alturaCorte).toFixed(2);
+    mtsTecido = +(nPanos * alturaCorteFinal).toFixed(2);
     sobraLateral = +(nPanos * v.larguraRolo - larguraFranzida).toFixed(2);
   }
 
