@@ -283,22 +283,29 @@ function StepMedidas({ input, set, result }: any) {
   const m = input.medidas;
   return (
     <div>
-      <StepTitle eyebrow="Etapa 2 · Medidas" title="Tome as medidas do ambiente" />
+      <StepTitle eyebrow="Etapa 2 · Medidas" title="Meça apenas a parede" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
         <div>
-          <SubLabel>Parede <span className="normal-case tracking-normal text-muted-foreground/70">(referência visual)</span></SubLabel>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-7">
+          <SubLabel>Parede <span className="normal-case tracking-normal text-gold/80">(dimensiona o orçamento)</span></SubLabel>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <NumField label="Largura" v={m.larguraParede} set={(v) => set("medidas", { larguraParede: v })} suf="m" />
             <NumField label="Altura" v={m.alturaParede} set={(v) => set("medidas", { alturaParede: v })} suf="m" />
           </div>
-          <SubLabel>Cortina desejada <span className="normal-case tracking-normal text-gold/80">(dimensiona o orçamento)</span></SubLabel>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            <NumField label="Largura" v={m.larguraCortina} set={(v) => set("medidas", { larguraCortina: v })} suf="m" />
-            <NumField label="Altura" v={m.alturaCortina} set={(v) => set("medidas", { alturaCortina: v })} suf="m" />
+
+          {/* Cortina desejada — calculada automaticamente (largura arredondada) */}
+          <div className="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-3">Cortina desejada <span className="normal-case tracking-normal">· calculada</span></div>
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <MiniInfo label="Largura (arredondada)" value={`${result.larguraCortina} m`} />
+              <MiniInfo label="Altura" value={`${m.alturaParede.toFixed(2)} m`} />
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-2.5 text-center">
+              Largura arredondada para o inteiro de cima ({m.larguraParede.toFixed(2)} m → {result.larguraCortina} m).
+            </div>
           </div>
 
           {/* Leitura do método de corte (Guia de Cálculo) */}
-          <div className="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
             <div className="flex items-center justify-between">
               <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Corte do tecido</span>
               <span className={`text-[11px] px-2 py-0.5 rounded-full ${result.caso === "B" ? "text-gold bg-[oklch(0.80_0.10_88_/_0.08)]" : "text-[oklch(0.78_0.10_150)] bg-[oklch(0.55_0.12_150_/_0.10)]"}`}>
@@ -313,10 +320,10 @@ function StepMedidas({ input, set, result }: any) {
           </div>
         </div>
         <div className="surface-flat rounded-xl p-6 flex items-center justify-center min-h-[220px]">
-          <PreviewJanela {...m} />
+          <PreviewJanela larguraParede={m.larguraParede} alturaParede={m.alturaParede} larguraCortina={result.larguraCortina} alturaCortina={m.alturaParede} />
         </div>
       </div>
-      {m.alturaCortina > 4.5 && (
+      {m.alturaParede > 4.5 && (
         <div className="mt-6 flex items-center gap-2 text-[12px] text-gold">
           <AlertTriangle className="w-3.5 h-3.5" /> Altura acima de 4,5m — andaime incluído automaticamente.
         </div>
@@ -492,7 +499,8 @@ function ResumoCliente({ input, result, alerta, tecidos, forros }: any) {
         <Row k="Forro" v={forro?.nome ?? "Sem forro"} />
         {input.estrutura.blackoutCodigo != null && <Row k="Blackout" v="Sim" />}
         <Row k="Trilho" v={result.trilhoInferido} />
-        <Row k="Medidas" v={`${input.medidas.larguraCortina} × ${input.medidas.alturaCortina} m`} />
+        <Row k="Parede" v={`${input.medidas.larguraParede} × ${input.medidas.alturaParede} m`} />
+        <Row k="Cortina" v={`${result.larguraCortina} × ${input.medidas.alturaParede} m`} />
         <Row k="Instalação" v={input.instalacao.instalar ? "Inclusa" : "Não inclusa"} />
 
         <div className="hairline my-5" />

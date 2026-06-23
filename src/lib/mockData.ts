@@ -44,19 +44,19 @@ function seedProposal(
 
 export const initialProposals: Proposal[] = [
   seedProposal("p1", "Marina Albuquerque", "Sala de Estar", "Aprovado", "2026-05-12", (i) => {
-    i.medidas.larguraCortina = 4.2; i.medidas.alturaCortina = 2.8; i.estrutura.tecidoCodigo = 1130;
+    i.medidas.larguraParede = 4.2; i.medidas.alturaParede = 2.8; i.estrutura.tecidoCodigo = 1130;
   }),
   seedProposal("p2", "Ricardo Mendes", "Suíte Master", "Enviado", "2026-05-15", (i) => {
-    i.medidas.larguraCortina = 3.0; i.medidas.alturaCortina = 2.6; i.estrutura.blackoutCodigo = 4681;
+    i.medidas.larguraParede = 3.0; i.medidas.alturaParede = 2.6; i.estrutura.blackoutCodigo = 4681;
   }),
   seedProposal("p3", "Helena Castro", "Home Office", "Rascunho", "2026-05-17", (i) => {
-    i.medidas.larguraCortina = 2.2; i.medidas.alturaCortina = 2.4; i.estrutura.forroCodigo = null; i.estrutura.modelo = "Prega macho";
+    i.medidas.larguraParede = 2.2; i.medidas.alturaParede = 2.4; i.estrutura.forroCodigo = null; i.estrutura.modelo = "Prega macho";
   }),
   seedProposal("p4", "Família Tavares", "Sala de Jantar", "Aprovado", "2026-05-09", (i) => {
-    i.medidas.larguraCortina = 5.0; i.medidas.alturaCortina = 3.0; i.estrutura.motorizada = true;
+    i.medidas.larguraParede = 5.0; i.medidas.alturaParede = 3.0; i.estrutura.motorizada = true;
   }),
   seedProposal("p5", "Studio M&P", "Showroom", "Aprovado", "2026-05-02", (i) => {
-    i.medidas.larguraCortina = 7.5; i.medidas.alturaCortina = 4.8; i.estrutura.tecidoCodigo = 5001; i.comercial.margemExtra = 10;
+    i.medidas.larguraParede = 7.5; i.medidas.alturaParede = 4.8; i.estrutura.tecidoCodigo = 5001; i.comercial.margemExtra = 10;
   }),
 ];
 

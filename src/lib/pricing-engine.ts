@@ -111,11 +111,13 @@ export interface AmbienteInput {
 }
 
 export interface MedidasInput {
-  larguraParede: number;
-  alturaParede: number;
-  larguraCortina: number; // largura desejada da cortina pronta (m)
-  alturaCortina: number;  // altura desejada (m)
+  larguraParede: number; // largura da parede (m) — única medida digitada
+  alturaParede: number;  // altura da parede (m)
 }
+
+/** Largura desejada da cortina = largura da parede arredondada para o inteiro de cima. */
+export const larguraCortinaDesejada = (larguraParede: number) =>
+  Math.max(1, Math.ceil(larguraParede || 0));
 
 export interface EstruturaInput {
   modelo: Modelo;
@@ -159,6 +161,7 @@ export interface CalcCtx {
 export interface CalcResult {
   // Composição técnica automática
   mtsProntos: number;        // largura da cortina pronta (m) = largura base
+  larguraCortina: number;    // largura desejada arredondada (⌈largura da parede⌉)
   caso: "A" | "B";           // método de corte (em pé / virar o rolo)
   alturaCorte: number;       // altura + bainha
   nPanos: number;            // nº de panos verticais (Caso B)
@@ -291,10 +294,11 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
     ? blackouts.find((t) => t.codigo === estrutura.blackoutCodigo) ?? null
     : null;
 
-  // Medidas base (Guia de Cálculo): L = largura a cobrir, H = altura.
-  const L = Math.max(medidas.larguraCortina || 0, 0);
-  const H = Math.max(medidas.alturaCortina || 0, 0);
+  // Medidas base (Guia de Cálculo): L = largura da parede, H = altura da parede.
+  const L = Math.max(medidas.larguraParede || 0, 0);
+  const H = Math.max(medidas.alturaParede || 0, 0);
   const mtsProntos = L;
+  const larguraCortina = larguraCortinaDesejada(L); // arredonda p/ inteiro (lateral)
   const temForro = !!forro;
   const temBlackout = !!blackout;
 
@@ -378,7 +382,7 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
   const { totalPagamento, valorParcela } = calcularParcelamento(totalFinal, comercial.forma, comercial.parcelas, v);
 
   return {
-    mtsProntos, caso, alturaCorte, nPanos, larguraFranzida, sobraLateral,
+    mtsProntos, larguraCortina, caso, alturaCorte, nPanos, larguraFranzida, sobraLateral,
     mtsTecido, mtsForro, mtsBlackout, mtsEntretela, mtsCordao,
     qtdRodizios, mtsTrilho: trilho.metros, trilhoInferido,
     custoTecido, custoForro, custoBlackout, custoMaoObra, custoCordao,
@@ -400,8 +404,7 @@ export const formatBRL = (v: number) =>
 export const defaultPricingInput = (): PricingInput => ({
   ambiente: { cliente: "", ambiente: "Sala de Estar", observacoes: "" },
   medidas: {
-    larguraParede: 3.5, alturaParede: 2.8,
-    larguraCortina: 3.0, alturaCortina: 2.5,
+    larguraParede: 2.8, alturaParede: 2.5,
   },
   estrutura: {
     modelo: "Wave",

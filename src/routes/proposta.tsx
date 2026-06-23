@@ -281,7 +281,7 @@ function DocumentoPreview({ proposal, cfg, res, empresa, validadeISO, tecidos, f
           <Spec k="Tecido" v={nome(tecidos, cfg.estrutura.tecidoCodigo)} />
           <Spec k="Forro" v={nome(forros, cfg.estrutura.forroCodigo, "Sem forro")} />
           <Spec k="Trilho" v={res.trilhoInferido} />
-          <Spec k="Medidas" v={`${cfg.medidas.larguraCortina} × ${cfg.medidas.alturaCortina} m`} />
+          <Spec k="Medidas" v={`${res.larguraCortina} × ${cfg.medidas.alturaParede} m`} />
           <Spec k="Instalação" v={cfg.instalacao.instalar ? `Inclusa · ${cfg.instalacao.dificuldade}` : "Não inclusa"} />
         </dl>
 
@@ -441,7 +441,7 @@ function gerarPDF({ proposal, cfg, res, empresa, validadeISO, tecidos, forros }:
     ["Forro", nome(forros, cfg.estrutura.forroCodigo, "Sem forro")],
     ["Acionamento", cfg.estrutura.motorizada ? "Motorizada" : "Manual"],
     ["Trilho", res.trilhoInferido],
-    ["Medidas da cortina", `${cfg.medidas.larguraCortina} × ${cfg.medidas.alturaCortina} m`],
+    ["Medidas da cortina", `${res.larguraCortina} × ${cfg.medidas.alturaParede} m`],
     ["Instalação", cfg.instalacao.instalar ? `Inclusa · ${cfg.instalacao.dificuldade}` : "Não inclusa"],
   ];
   doc.setFontSize(10.5);
