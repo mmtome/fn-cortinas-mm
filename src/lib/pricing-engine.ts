@@ -300,9 +300,7 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
 
   // --- Metragem de tecido pelo método dos dois casos de corte ---
   const larguraFranzida = +(L * v.fatorTecido).toFixed(2); // caimento (×3)
-  // Decisão A/B usa a dobra mínima (ainda usável). A bainha cheia entra só na metragem do Caso B.
-  const alturaCorteLimite = +(H + v.bainhaLimite).toFixed(2);
-  const alturaCorteFinal = +(H + v.bainha).toFixed(2);
+  const alturaCorteFinal = +(H + v.bainha).toFixed(2);     // altura + bainha cheia (Caso B)
 
   let caso: "A" | "B";
   let nPanos = 0;
@@ -310,13 +308,15 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
   let sobraLateral = 0;
   let alturaCorte: number;
 
-  if (alturaCorteLimite <= v.larguraUtilRolo) {
-    // Caso A — rolo "em pé": cabe na largura útil com a dobra mínima. Compra pela largura.
+  // A altura crua da cortina decide o corte: enquanto cabe na largura útil, fica "em pé".
+  if (H <= v.larguraUtilRolo) {
+    // Caso A — rolo "em pé": a altura cabe na largura útil. Compra pela largura.
+    // Só a dobra mínima é necessária aqui (ainda usável e cabe no rolo cheio).
     caso = "A";
-    alturaCorte = alturaCorteLimite;
+    alturaCorte = +(H + v.bainhaLimite).toFixed(2);
     mtsTecido = larguraFranzida;
   } else {
-    // Caso B — "virar o rolo": há comprimento de sobra, então usa a bainha cheia.
+    // Caso B — "virar o rolo": panos verticais; há comprimento de sobra → bainha cheia.
     caso = "B";
     alturaCorte = alturaCorteFinal;
     nPanos = Math.max(1, Math.ceil((L * v.fatorTecido) / v.larguraRolo)); // = ⌈L⌉ nos padrões

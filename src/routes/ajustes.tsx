@@ -226,8 +226,8 @@ const GROUPS: { title: string; fields: VarField[] }[] = [
     title: "Corte do tecido (rolo)",
     fields: [
       { key: "larguraRolo", label: "Largura do rolo", suf: "m", step: 0.05 },
-      { key: "larguraUtilRolo", label: "Largura útil (limite A/B)", suf: "m", step: 0.05 },
-      { key: "bainhaLimite", label: "Dobra p/ limite A/B", suf: "m", step: 0.05 },
+      { key: "larguraUtilRolo", label: "Largura útil / alt. máx. em pé", suf: "m", step: 0.05 },
+      { key: "bainhaLimite", label: "Dobra mínima (Caso A)", suf: "m", step: 0.05 },
       { key: "bainha", label: "Bainha cheia (cima+baixo)", suf: "m", step: 0.05 },
       { key: "forroSeparadoFator", label: "Forro separado (×)", step: 0.1 },
     ],
