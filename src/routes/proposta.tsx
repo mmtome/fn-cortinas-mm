@@ -162,6 +162,7 @@ function BreakdownEmpresa({ res, comodos, tecidos }: { res: PropostaResult; como
                 {r.sobraLateral > 0 && <Cell k="Sobra lateral" v={`${r.sobraLateral.toFixed(2)} m`} />}
                 <Cell k="Produção" v={formatBRL(r.subtotalProducao)} />
                 {r.custoInstalacao > 0 && <Cell k="Instalação" v={formatBRL(r.custoInstalacao)} />}
+                {r.custoMotorizada > 0 && <Cell k="Motorizada" v={formatBRL(r.custoMotorizada)} />}
               </div>
             </div>
           );

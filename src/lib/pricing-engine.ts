@@ -26,10 +26,11 @@ export const DEFAULT_VARS = {
   descontoPix: 0.01,
   jurosCredito1x: 0.033,
   andaimeAlturaMin: 4.5,
-  andaimeValor: 250,
+  andaimeValor: 100,       // adicional quando a altura passa de 4,5m
+  motorizadaValor: 100,    // adicional quando a cortina é motorizada
   maoDeObraPorMetroTecido: 16,
-  instalacaoSemForro: 170,
-  instalacaoComForro: 220,
+  instalacaoSemForro: 170, // sem forro ou forro costurado junto
+  instalacaoComForro: 220, // com forro separado (trilho duplo)
   fatorDificuldade: 1.4,
 
   // Corte do tecido (rolo) — base do Guia de Cálculo
@@ -185,6 +186,7 @@ export interface CalcResult {
   custoEntretela: number;
   custoTrilho: number;
   custoAndaime: number;
+  custoMotorizada: number;
   custoInstalacao: number;
   custoDeslocamento: number;
   // Totais
@@ -365,17 +367,21 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
   const custoTrilho    = trilho.custo;
   const custoMaoObra   = calcularMaoDeObra(mtsTecido + mtsForro + mtsBlackout, v);
 
-  // Instalação
+  // Instalação — R$220 só com forro separado (trilho duplo); senão R$170.
+  const forroSeparado = (temForro && !estrutura.costuraXForro) || temBlackout;
   const custoAndaime = calcularAndaime(H, v);
+  const custoMotorizada = estrutura.motorizada ? v.motorizadaValor : 0;
   const fatorDificuldade = instalacao.dificuldade === "Difícil" ? v.fatorDificuldade : 1;
-  const custoInstalacao = calcularInstalacao(instalacao.instalar, temForro || temBlackout, v) * fatorDificuldade + custoAndaime;
+  const custoInstalacao = calcularInstalacao(instalacao.instalar, forroSeparado, v) * fatorDificuldade + custoAndaime;
   const custoDeslocamento = instalacao.deslocamento || 0;
 
   const subtotalProducao =
     custoTecido + custoForro + custoBlackout + custoMaoObra +
     custoRodizio + custoCordao + custoEntretela + custoTrilho;
 
-  const totalComLucro = aplicarLucro(subtotalProducao, custoInstalacao, custoDeslocamento, comercial.margemExtra, v);
+  // Adicionais fixos (não recebem lucro): instalação, andaime, motorizada, deslocamento.
+  const adicionaisFixos = custoInstalacao + custoMotorizada;
+  const totalComLucro = aplicarLucro(subtotalProducao, adicionaisFixos, custoDeslocamento, comercial.margemExtra, v);
   const descontoValor = totalComLucro * (comercial.desconto / 100);
   const totalFinal = totalComLucro - descontoValor;
 
@@ -386,7 +392,7 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
     mtsTecido, mtsForro, mtsBlackout, mtsEntretela, mtsCordao,
     qtdRodizios, mtsTrilho: trilho.metros, trilhoInferido,
     custoTecido, custoForro, custoBlackout, custoMaoObra, custoCordao,
-    custoRodizio, custoEntretela, custoTrilho, custoAndaime,
+    custoRodizio, custoEntretela, custoTrilho, custoAndaime, custoMotorizada,
     custoInstalacao, custoDeslocamento,
     subtotalProducao, totalComLucro, descontoValor, totalFinal,
     totalPagamento, valorParcela,

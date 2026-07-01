@@ -219,7 +219,8 @@ const GROUPS: { title: string; fields: VarField[] }[] = [
       { key: "instalacaoComForro", label: "Instalação com forro", suf: "R$" },
       { key: "fatorDificuldade", label: "Fator difícil", step: 0.1 },
       { key: "andaimeAlturaMin", label: "Altura p/ andaime", suf: "m", step: 0.1 },
-      { key: "andaimeValor", label: "Valor do andaime", suf: "R$" },
+      { key: "andaimeValor", label: "Adicional andaime", suf: "R$" },
+      { key: "motorizadaValor", label: "Adicional motorizada", suf: "R$" },
     ],
   },
   {
