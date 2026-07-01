@@ -59,31 +59,53 @@ function EmpresaTab() {
   const salvar = () => { store.updateEmpresa(form); toast.success("Dados da empresa salvos"); };
 
   return (
-    <div className="surface rounded-2xl p-6 max-w-2xl">
-      <div className="text-[13px] font-medium mb-1">Dados da empresa</div>
-      <div className="text-[12px] text-muted-foreground mb-6">Aparecem no cabeçalho e rodapé do PDF enviado ao cliente.</div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Nome da empresa">
-          <input className={inputCls} value={form.nome} onChange={(e) => setF({ nome: e.target.value })} placeholder="FN Cortinas" />
-        </Field>
-        <Field label="Slogan">
-          <input className={inputCls} value={form.slogan} onChange={(e) => setF({ slogan: e.target.value })} placeholder="Cortinas sob medida · Alto padrão" />
-        </Field>
-        <Field label="Telefone / WhatsApp">
-          <input className={inputCls} value={form.telefone} onChange={(e) => setF({ telefone: e.target.value })} placeholder="(11) 99999-9999" />
-        </Field>
-        <Field label="Instagram">
-          <input className={inputCls} value={form.instagram} onChange={(e) => setF({ instagram: e.target.value })} placeholder="@fncortinas" />
-        </Field>
-        <Field label="E-mail">
-          <input className={inputCls} value={form.email} onChange={(e) => setF({ email: e.target.value })} placeholder="contato@fncortinas.com.br" />
-        </Field>
-        <Field label="Site">
-          <input className={inputCls} value={form.site} onChange={(e) => setF({ site: e.target.value })} placeholder="www.fncortinas.com.br" />
-        </Field>
+    <div className="max-w-2xl space-y-6">
+      <div className="surface rounded-2xl p-6">
+        <div className="text-[13px] font-medium mb-1">Dados da empresa</div>
+        <div className="text-[12px] text-muted-foreground mb-6">Aparecem no cabeçalho e rodapé do PDF enviado ao cliente.</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Nome da empresa">
+            <input className={inputCls} value={form.nome} onChange={(e) => setF({ nome: e.target.value })} placeholder="FN Cortinas" />
+          </Field>
+          <Field label="Slogan">
+            <input className={inputCls} value={form.slogan} onChange={(e) => setF({ slogan: e.target.value })} placeholder="Cortinas sob medida · Alto padrão" />
+          </Field>
+          <Field label="Telefone / WhatsApp">
+            <input className={inputCls} value={form.telefone} onChange={(e) => setF({ telefone: e.target.value })} placeholder="(11) 99999-9999" />
+          </Field>
+          <Field label="Instagram">
+            <input className={inputCls} value={form.instagram} onChange={(e) => setF({ instagram: e.target.value })} placeholder="@fncortinas" />
+          </Field>
+          <Field label="E-mail">
+            <input className={inputCls} value={form.email} onChange={(e) => setF({ email: e.target.value })} placeholder="contato@fncortinas.com.br" />
+          </Field>
+          <Field label="Site">
+            <input className={inputCls} value={form.site} onChange={(e) => setF({ site: e.target.value })} placeholder="www.fncortinas.com.br" />
+          </Field>
+        </div>
+        <div className="flex justify-end mt-6">
+          <GoldButton onClick={salvar}>Salvar dados</GoldButton>
+        </div>
       </div>
-      <div className="flex justify-end mt-6">
-        <GoldButton onClick={salvar}>Salvar dados</GoldButton>
+
+      {/* Zona de dados de teste */}
+      <div className="surface rounded-2xl p-6">
+        <div className="text-[13px] font-medium mb-1">Dados de teste</div>
+        <div className="text-[12px] text-muted-foreground mb-5">Zere o faturamento para acompanhar do zero durante os testes.</div>
+        <div className="flex flex-wrap gap-2">
+          <GoldButton
+            variant="outline"
+            onClick={() => { if (confirm("Zerar todas as propostas? O faturamento volta a zero.")) { store.limparPropostas(); toast.success("Propostas zeradas"); } }}
+          >
+            Zerar propostas (faturamento)
+          </GoldButton>
+          <GoldButton
+            variant="ghost"
+            onClick={() => { if (confirm("Restaurar os dados de exemplo (propostas, estoque, materiais e variáveis)?")) { store.resetData(); toast.success("Dados de exemplo restaurados"); } }}
+          >
+            Restaurar dados de exemplo
+          </GoldButton>
+        </div>
       </div>
     </div>
   );

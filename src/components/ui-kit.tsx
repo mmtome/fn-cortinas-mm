@@ -66,6 +66,7 @@ export function StatCard({
 
 export function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
+    Pendente: "text-[oklch(0.78_0.06_250)] bg-[oklch(0.5_0.08_250_/_0.12)]",
     Rascunho: "text-muted-foreground bg-white/[0.04]",
     Enviado: "text-[oklch(0.78_0.06_250)] bg-[oklch(0.5_0.08_250_/_0.12)]",
     Aprovado: "text-gold bg-[oklch(0.80_0.10_88_/_0.08)]",

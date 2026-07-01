@@ -244,9 +244,10 @@ function DocumentoPreview({ proposal, comodos, res, comercial, empresa, validade
         <div className="text-[32px] sm:text-[40px] font-medium tracking-tight leading-tight">Comercial</div>
         <div className="w-12 h-px bg-[oklch(0.80_0.10_88_/_0.6)] mt-7 mb-7" />
         <div className="text-[12px] text-muted-foreground space-y-1.5">
-          <div className="text-foreground">{proposal.cliente}</div>
-          <div>{comodos.length} {comodos.length > 1 ? "cômodos" : "cômodo"}</div>
-          <div>{formatDate(proposal.data)}</div>
+          <div className="text-foreground text-[13px]">{proposal.cliente}</div>
+          {proposal.contato && <div>{proposal.contato}</div>}
+          {proposal.endereco && <div>{proposal.endereco}</div>}
+          <div className="pt-1">{comodos.length} {comodos.length > 1 ? "cômodos" : "cômodo"} · {formatDate(proposal.data)}</div>
         </div>
       </div>
 
@@ -364,9 +365,11 @@ function gerarPDF({ proposal, comodos, res, comercial, empresa, validadeISO, tec
   doc.setDrawColor(...gold); doc.setLineWidth(0.5); doc.line(M, h / 2 + 62, M + 70, h / 2 + 62);
   doc.setTextColor(206, 200, 184); doc.setFont("helvetica", "bold"); doc.setFontSize(13);
   doc.text(proposal.cliente, M, h / 2 + 96);
+  let cy = h / 2 + 114;
   doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(168, 162, 148);
-  doc.text(`${comodos.length} ${comodos.length > 1 ? "cômodos" : "cômodo"}`, M, h / 2 + 114);
-  doc.text(new Date(proposal.data).toLocaleDateString("pt-BR"), M, h / 2 + 130);
+  if (proposal.contato) { doc.text(proposal.contato, M, cy); cy += 16; }
+  if (proposal.endereco) { doc.text(proposal.endereco, M, cy); cy += 16; }
+  doc.text(`${comodos.length} ${comodos.length > 1 ? "cômodos" : "cômodo"}  ·  ${new Date(proposal.data).toLocaleDateString("pt-BR")}`, M, cy);
   doc.setTextColor(150, 144, 128); doc.setFontSize(8.5);
   doc.text(empresa.slogan || "Cortinas e persianas sob medida", M, h - M);
   if (contatos.length) { doc.setTextColor(...gold); doc.text(contatos.join("   ·   "), M, h - M + 16); }

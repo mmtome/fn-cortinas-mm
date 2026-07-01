@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from "react";
-import { initialProposals, initialStock, type Proposal, type StockItem } from "./mockData";
+import { initialProposals, initialStock, type Proposal, type ProposalStatus, type StockItem } from "./mockData";
 import { ambienteLabel } from "./pricing-engine";
 import {
   CATALOGO_TECIDOS,
@@ -41,7 +41,9 @@ type State = {
   empresa: Empresa;
 };
 
-const STORAGE_KEY = "fn-cortinas:v1";
+// v2: novos status (Pendente/Aprovado/Perdido), campos endereço/contato e
+// faturamento zerado. Bump da versão recomeça do zero para testes.
+const STORAGE_KEY = "fn-cortinas:v2";
 
 function defaultState(): State {
   return {
@@ -69,9 +71,20 @@ function persist() {
   }
 }
 
-/** Converte propostas no formato antigo (input/result único) para comodos[]. */
+const STATUS_MAP: Record<string, ProposalStatus> = {
+  Rascunho: "Pendente", Enviado: "Pendente", Pendente: "Pendente",
+  Aprovado: "Aprovado", Perdido: "Perdido",
+};
+
+/** Normaliza propostas: status novo, endereço/contato e formato comodos[]. */
 function migrateProposal(p: any): Proposal {
-  if (p && Array.isArray(p.comodos)) return p as Proposal;
+  const status: ProposalStatus = STATUS_MAP[p?.status] ?? "Pendente";
+  const endereco = p?.endereco ?? "";
+  const contato = p?.contato ?? "";
+
+  if (p && Array.isArray(p.comodos)) {
+    return { ...p, status, endereco, contato } as Proposal;
+  }
   const input = p?.input;
   if (input) {
     const med = input.medidas ?? {};
@@ -88,15 +101,15 @@ function migrateProposal(p: any): Proposal {
       result: p.result,
     };
     return {
-      id: p.id, cliente: p.cliente, comodos: [comodo], comercial: input.comercial,
-      valor: p.valor, status: p.status, data: p.data, ambiente: ambienteLabel([comodo]),
+      id: p.id, cliente: p.cliente, endereco, contato, comodos: [comodo], comercial: input.comercial,
+      valor: p.valor, status, data: p.data, ambiente: ambienteLabel([comodo]),
     };
   }
   // Proposta antiga sem detalhamento — mantém cabeçalho, sem cômodos.
   return {
-    id: p.id, cliente: p.cliente, comodos: [],
+    id: p.id, cliente: p.cliente, endereco, contato, comodos: [],
     comercial: { desconto: 0, margemExtra: 0, forma: "Pix", parcelas: 1 },
-    valor: p.valor ?? 0, status: p.status, data: p.data, ambiente: p.ambiente ?? "—",
+    valor: p.valor ?? 0, status, data: p.data, ambiente: p.ambiente ?? "—",
   };
 }
 
@@ -160,6 +173,9 @@ export const store = {
   removeProposal: (id: string) => {
     commit({ ...state, proposals: state.proposals.filter((p) => p.id !== id) });
   },
+  setStatus: (id: string, status: ProposalStatus) => {
+    commit({ ...state, proposals: state.proposals.map((p) => (p.id === id ? { ...p, status } : p)) });
+  },
   duplicateProposal: (id: string) => {
     const original = state.proposals.find((p) => p.id === id);
     if (!original) return;
@@ -167,7 +183,7 @@ export const store = {
       ...original,
       id: uid("p"),
       cliente: original.cliente + " (cópia)",
-      status: "Rascunho",
+      status: "Pendente",
       data: new Date().toISOString().slice(0, 10),
     };
     store.upsertProposal(copy);
@@ -212,6 +228,15 @@ export const store = {
   // ---- Empresa ----
   updateEmpresa: (patch: Partial<Empresa>) => {
     commit({ ...state, empresa: { ...state.empresa, ...patch } });
+  },
+
+  // ---- Reset (zera para os dados de exemplo) ----
+  resetData: () => {
+    commit(defaultState());
+  },
+  /** Zera só as propostas (faturamento volta a zero, mantém estoque/variáveis/empresa). */
+  limparPropostas: () => {
+    commit({ ...state, proposals: [] });
   },
 };
 

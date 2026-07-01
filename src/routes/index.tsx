@@ -6,7 +6,7 @@ import {
 
 import { PageHeader, Card, StatusBadge, GoldButton, formatDate } from "@/components/ui-kit";
 import { useStore } from "@/lib/store";
-import { salesData, stockStatus } from "@/lib/mockData";
+import { faturamentoMensal, stockStatus } from "@/lib/mockData";
 import { formatBRL } from "@/lib/pricing-engine";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
@@ -16,9 +16,11 @@ function Dashboard() {
   const stock = useStore((s) => s.stock);
 
   const aprovadas = proposals.filter((p) => p.status === "Aprovado");
+  const pendentes = proposals.filter((p) => p.status === "Pendente");
   const vendido = aprovadas.reduce((a, b) => a + b.valor, 0);
   const ticket = aprovadas.length ? vendido / aprovadas.length : 0;
   const criticos = stock.filter((s) => stockStatus(s) !== "disponivel").length;
+  const chartData = faturamentoMensal(proposals);
 
   return (
     <>
@@ -36,10 +38,11 @@ function Dashboard() {
         }
       />
 
-      {/* Indicadores essenciais — 3 apenas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/[0.04] rounded-2xl overflow-hidden mb-10">
-        <Indicator label="Valor vendido" value={formatBRL(vendido)} hint={`${aprovadas.length} propostas aprovadas`} />
+      {/* Indicadores essenciais */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-px bg-white/[0.04] rounded-2xl overflow-hidden mb-10">
+        <Indicator label="Faturamento" value={formatBRL(vendido)} hint={`${aprovadas.length} aprovadas`} />
         <Indicator label="Ticket médio" value={formatBRL(ticket)} hint="Por proposta fechada" />
+        <Indicator label="Pendentes" value={String(pendentes.length)} hint="Aguardando decisão" />
         <Indicator label="Atenção em estoque" value={String(criticos)} hint={criticos === 0 ? "Tudo em ordem" : "Itens abaixo do mínimo"} accent={criticos > 0} />
       </div>
 
@@ -48,41 +51,40 @@ function Dashboard() {
         <Card className="lg:col-span-2">
           <div className="flex items-end justify-between mb-8">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Movimento</div>
-              <div className="text-[15px] mt-1.5">Últimos cinco meses</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Faturamento</div>
+              <div className="text-[15px] mt-1.5">Propostas aprovadas por mês</div>
             </div>
             <div className="text-right">
               <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Acumulado</div>
-              <div className="text-[14px] font-medium stat mt-1">
-                {formatBRL(salesData.reduce((a, b) => a + b.valor, 0))}
-              </div>
+              <div className="text-[14px] font-medium stat mt-1">{formatBRL(vendido)}</div>
             </div>
           </div>
           <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={salesData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="oklch(0.80 0.10 88)" stopOpacity={0.14} />
-                    <stop offset="100%" stopColor="oklch(0.80 0.10 88)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="mes" stroke="oklch(0.55 0.012 260)" fontSize={11} tickLine={false} axisLine={false} dy={6} />
-                <YAxis stroke="oklch(0.55 0.012 260)" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  cursor={{ stroke: "oklch(0.80 0.10 88 / 0.2)", strokeWidth: 1 }}
-                  contentStyle={{
-                    background: "oklch(0.20 0.025 262)",
-                    border: "1px solid oklch(1 0 0 / 0.06)",
-                    borderRadius: 8,
-                    color: "oklch(0.95 0.005 250)",
-                    fontSize: 12,
-                  }}
-                  formatter={(v: number) => formatBRL(v)}
-                />
-                <Area type="monotone" dataKey="valor" stroke="oklch(0.80 0.10 88)" strokeWidth={1.5} fill="url(#gold)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {chartData.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center">
+                <div className="text-[13px] text-muted-foreground">Nenhum faturamento ainda.</div>
+                <div className="text-[11px] text-muted-foreground/70 mt-1 max-w-xs">Marque propostas como <span className="text-gold">Aprovado</span> na aba Registros para acompanhar aqui.</div>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="oklch(0.80 0.10 88)" stopOpacity={0.14} />
+                      <stop offset="100%" stopColor="oklch(0.80 0.10 88)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="mes" stroke="oklch(0.55 0.012 260)" fontSize={11} tickLine={false} axisLine={false} dy={6} />
+                  <YAxis stroke="oklch(0.55 0.012 260)" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip
+                    cursor={{ stroke: "oklch(0.80 0.10 88 / 0.2)", strokeWidth: 1 }}
+                    contentStyle={{ background: "oklch(0.20 0.025 262)", border: "1px solid oklch(1 0 0 / 0.06)", borderRadius: 8, color: "oklch(0.95 0.005 250)", fontSize: 12 }}
+                    formatter={(v: number) => formatBRL(v)}
+                  />
+                  <Area type="monotone" dataKey="valor" stroke="oklch(0.80 0.10 88)" strokeWidth={1.5} fill="url(#gold)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </Card>
 

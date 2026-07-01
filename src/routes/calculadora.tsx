@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Save, Check, AlertTriangle, Minus, Plus, Trash2, Home, Wallet } from "lucide-react";
+import { Save, AlertTriangle, Minus, Plus, Trash2, Home, Wallet } from "lucide-react";
 
 import { PageHeader, GoldButton, Field, Switch, inputCls, selectCls } from "@/components/ui-kit";
 import {
@@ -35,6 +35,8 @@ function Calculadora() {
   const ctx = useCalcCtx();
 
   const [cliente, setCliente] = useState("");
+  const [endereco, setEndereco] = useState("");
+  const [contato, setContato] = useState("");
   const [comodos, setComodos] = useState<ComodoInput[]>([defaultComodo()]);
   const [comercial, setComercial] = useState<ComercialInput>(defaultPricingInput().comercial);
   const [active, setActive] = useState(0);
@@ -71,7 +73,7 @@ function Calculadora() {
     });
   };
 
-  const salvar = (status: "Rascunho" | "Enviado") => {
+  const salvar = () => {
     if (!cliente.trim()) {
       toast.error("Informe o nome do cliente");
       return;
@@ -81,14 +83,16 @@ function Calculadora() {
     store.upsertProposal({
       id,
       cliente,
+      endereco,
+      contato,
       comodos: comodosData,
       comercial,
       valor: result.totalFinal,
-      status,
+      status: "Pendente",
       data: new Date().toISOString().slice(0, 10),
       ambiente: ambienteLabel(comodos),
     });
-    toast.success(status === "Enviado" ? "Proposta finalizada" : "Rascunho salvo");
+    toast.success("Proposta salva");
     navigate({ to: "/registros" });
   };
 
@@ -113,9 +117,19 @@ function Calculadora() {
         <div className="space-y-5">
           {/* Cliente */}
           <div className="surface rounded-2xl p-5 sm:p-6">
-            <Field label="Nome do cliente">
-              <input className={inputCls} value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Ex: Marina Albuquerque" />
-            </Field>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <Field label="Nome do cliente">
+                <input className={inputCls} value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Ex: Marina Albuquerque" />
+              </Field>
+              <Field label="Contato" hint="Telefone / WhatsApp">
+                <input className={inputCls} value={contato} onChange={(e) => setContato(e.target.value)} placeholder="(11) 99999-9999" />
+              </Field>
+              <div className="md:col-span-2">
+                <Field label="Endereço">
+                  <input className={inputCls} value={endereco} onChange={(e) => setEndereco(e.target.value)} placeholder="Rua, número, bairro — cidade" />
+                </Field>
+              </div>
+            </div>
           </div>
 
           {/* Barra de cômodos */}
@@ -308,12 +322,9 @@ function Calculadora() {
               <div key={result.totalFinal} className="text-[30px] sm:text-[34px] font-medium tracking-tight stat animate-value">{formatBRL(result.totalFinal)}</div>
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-end gap-2 mt-6">
-              <GoldButton variant="outline" onClick={() => salvar("Rascunho")} className="justify-center">
-                <Save className="w-3.5 h-3.5" /> Salvar rascunho
-              </GoldButton>
-              <GoldButton onClick={() => salvar("Enviado")} className="justify-center">
-                Finalizar proposta <Check className="w-3.5 h-3.5" />
+            <div className="flex justify-end gap-2 mt-6">
+              <GoldButton onClick={salvar} className="justify-center">
+                <Save className="w-3.5 h-3.5" /> Salvar proposta
               </GoldButton>
             </div>
           </div>
