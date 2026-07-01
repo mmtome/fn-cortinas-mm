@@ -10,8 +10,9 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/estoque")({ component: Estoque });
 
-const CATEGORIAS = ["Todos", "Tecido", "Forro", "Trilho", "Varão", "Acessório"];
-const CATS_FORM = ["Tecido", "Forro", "Trilho", "Varão", "Acessório"] as const;
+const CATEGORIAS = ["Todos", "Tecido", "Forro", "Blackout", "Trilho", "Varão", "Acessório"];
+const CATS_FORM = ["Tecido", "Forro", "Blackout", "Trilho", "Varão", "Acessório"] as const;
+const CATS_MATERIAL = ["Tecido", "Forro", "Blackout"];
 const UNIDADES = ["m", "un", "kg", "rolo", "cx"];
 
 type Form = {
@@ -187,6 +188,11 @@ function Estoque() {
         }
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {CATS_MATERIAL.includes(form.categoria) && (
+            <div className="sm:col-span-2 rounded-lg border border-[oklch(0.80_0.10_88_/_0.2)] bg-[oklch(0.80_0.10_88_/_0.04)] px-3 py-2 text-[11px] text-gold">
+              Este material vira opção automática na Calculadora. O custo é usado como preço por metro (R$/m).
+            </div>
+          )}
           <div className="sm:col-span-2">
             <Field label="Nome do item">
               <input autoFocus className={inputCls} value={form.nome} onChange={(e) => setF({ nome: e.target.value })} placeholder="Ex: Voil Bruxelas Areia" />

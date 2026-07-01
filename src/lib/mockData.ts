@@ -32,7 +32,7 @@ export interface Proposal {
 export interface StockItem {
   id: string;
   nome: string;
-  categoria: "Tecido" | "Forro" | "Trilho" | "Varão" | "Acessório";
+  categoria: "Tecido" | "Forro" | "Blackout" | "Trilho" | "Varão" | "Acessório";
   codigo?: number;
   quantidade: number;
   unidade: string;
@@ -94,7 +94,7 @@ export const initialStock: StockItem[] = [
   { id: "s2", nome: "Voil Bruxelas Titânio",     categoria: "Tecido",    codigo: 1132, quantidade: 18, unidade: "m",  custo: 23, minimo: 30 },
   { id: "s3", nome: "Cetim Pérola",              categoria: "Tecido",    codigo: 1102, quantidade: 42, unidade: "m",  custo: 23, minimo: 30 },
   { id: "s4", nome: "Lisieux Linho Areia",       categoria: "Tecido",    codigo: 1502, quantidade: 27, unidade: "m",  custo: 23, minimo: 25 },
-  { id: "s5", nome: "Blackout Superblack Chumbo",categoria: "Tecido",    codigo: 4681, quantidade: 12, unidade: "m",  custo: 23, minimo: 20 },
+  { id: "s5", nome: "Blackout Superblack Chumbo",categoria: "Blackout",  codigo: 4681, quantidade: 12, unidade: "m",  custo: 23, minimo: 20 },
   { id: "s6", nome: "Microfibra 100g Bege",      categoria: "Forro",     codigo: 1300, quantidade: 65, unidade: "m",  custo: 13, minimo: 30 },
   { id: "s7", nome: "Voil Ligório OffWhite",     categoria: "Forro",     codigo: 1140, quantidade: 22, unidade: "m",  custo: 23, minimo: 25 },
   { id: "s8", nome: "Varão Suíço 28mm Cromado",  categoria: "Varão",     quantidade: 9,  unidade: "un", custo: 13, minimo: 6 },

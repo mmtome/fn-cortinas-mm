@@ -153,6 +153,36 @@ let seq = 0;
 const uid = (prefix: string) =>
   `${prefix}${Date.now().toString(36)}${(seq++).toString(36)}`;
 
+// -------------------- Estoque ⇄ Catálogo de materiais --------------------
+// Itens de estoque nessas categorias também viram opção na Calculadora.
+const KIND_OF: Partial<Record<StockItem["categoria"], MaterialKind>> = {
+  Tecido: "tecidos",
+  Forro: "forros",
+  Blackout: "blackouts",
+};
+
+function proximoCodigo(s: State): number {
+  const todos = [...s.tecidos, ...s.forros, ...s.blackouts].map((t) => t.codigo);
+  return (todos.length ? Math.max(...todos) : 8999) + 1;
+}
+
+/** Reflete um item de estoque (tecido/forro/blackout) no catálogo da calculadora. */
+function syncMaterial(s: State, item: StockItem): State {
+  const kind = KIND_OF[item.categoria];
+  if (!kind || item.codigo == null) return s;
+  const mat: Tecido = {
+    codigo: item.codigo,
+    nome: item.nome,
+    largura: 3,
+    precoMetro: item.custo,
+    ...(kind === "blackouts" ? { blackout: true } : {}),
+  };
+  const list = s[kind];
+  const exists = list.some((t) => t.codigo === item.codigo);
+  const nextList = exists ? list.map((t) => (t.codigo === item.codigo ? { ...t, ...mat } : t)) : [...list, mat];
+  return { ...s, [kind]: nextList } as State;
+}
+
 // -------------------- Store API --------------------
 export const store = {
   getState: () => state,
@@ -189,18 +219,33 @@ export const store = {
     store.upsertProposal(copy);
   },
 
-  // ---- Estoque ----
+  // ---- Estoque (sincroniza materiais com o catálogo da calculadora) ----
   addStock: (item: Omit<StockItem, "id">) => {
-    commit({ ...state, stock: [{ ...item, id: uid("s") }, ...state.stock] });
+    const kind = KIND_OF[item.categoria];
+    const codigo = kind && item.codigo == null ? proximoCodigo(state) : item.codigo;
+    const stockItem: StockItem = { ...item, codigo, id: uid("s") };
+    commit(syncMaterial({ ...state, stock: [stockItem, ...state.stock] }, stockItem));
   },
   updateStock: (id: string, patch: Partial<StockItem>) => {
-    commit({
-      ...state,
-      stock: state.stock.map((s) => (s.id === id ? { ...s, ...patch } : s)),
-    });
+    let stock = state.stock.map((s) => (s.id === id ? { ...s, ...patch } : s));
+    let item = stock.find((s) => s.id === id);
+    if (item && KIND_OF[item.categoria] && item.codigo == null) {
+      const codigo = proximoCodigo(state);
+      stock = stock.map((s) => (s.id === id ? { ...s, codigo } : s));
+      item = { ...item, codigo };
+    }
+    let next: State = { ...state, stock };
+    if (item) next = syncMaterial(next, item);
+    commit(next);
   },
   removeStock: (id: string) => {
-    commit({ ...state, stock: state.stock.filter((s) => s.id !== id) });
+    const item = state.stock.find((s) => s.id === id);
+    let next: State = { ...state, stock: state.stock.filter((s) => s.id !== id) };
+    const kind = item ? KIND_OF[item.categoria] : undefined;
+    if (item && kind && item.codigo != null) {
+      next = { ...next, [kind]: next[kind].filter((t) => t.codigo !== item.codigo) } as State;
+    }
+    commit(next);
   },
 
   // ---- Materiais (catálogos) ----

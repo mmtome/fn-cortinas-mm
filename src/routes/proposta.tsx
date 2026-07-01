@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Download, Save, Building2, SlidersHorizontal, Home } from "lucide-react";
+import { Download, Save, Building2, SlidersHorizontal, Home, Check } from "lucide-react";
 import jsPDF from "jspdf";
 
-import { PageHeader, Card, GoldButton, Field, selectCls, inputCls, formatDate } from "@/components/ui-kit";
+import { PageHeader, Card, GoldButton, Modal, Field, selectCls, inputCls, formatDate } from "@/components/ui-kit";
 import { useStore, store, useCalcCtx } from "@/lib/store";
 import { calcularProposta, formatBRL, type Tecido, type ComercialInput, type PropostaResult } from "@/lib/pricing-engine";
 import type { ComodoData } from "@/lib/mockData";
@@ -58,9 +58,24 @@ function Proposta() {
     toast.success("Ajustes salvos na proposta");
   };
 
-  const baixarPDF = () => {
+  // Popup de opções do PDF: escolher quais cômodos entram na proposta
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [sel, setSel] = useState<boolean[]>([]);
+
+  const abrirPDF = () => {
     if (!proposal || !res || !comercial) return;
-    gerarPDF({ proposal, comodos, res, comercial, empresa, validadeISO, tecidos, forros });
+    setSel(comodos.map(() => true));
+    setPdfOpen(true);
+  };
+
+  const gerarComSelecao = () => {
+    if (!proposal || !comercial) return;
+    const selecionados = comodos.filter((_, i) => sel[i]);
+    if (!selecionados.length) { toast.error("Selecione ao menos um cômodo"); return; }
+    const resSel = calcularProposta(selecionados, comercial, ctx);
+    gerarPDF({ proposal, comodos: selecionados, res: resSel, comercial, empresa, validadeISO, tecidos, forros });
+    setPdfOpen(false);
+    toast.success(`PDF gerado com ${selecionados.length} ${selecionados.length > 1 ? "cômodos" : "cômodo"}`);
   };
 
   return (
@@ -73,7 +88,7 @@ function Proposta() {
           proposal && res && (
             <div className="hidden sm:flex gap-2">
               <GoldButton variant="outline" onClick={salvarAjustes}><Save className="w-3.5 h-3.5" /> Salvar ajustes</GoldButton>
-              <GoldButton onClick={baixarPDF}><Download className="w-3.5 h-3.5" /> Baixar PDF</GoldButton>
+              <GoldButton onClick={abrirPDF}><Download className="w-3.5 h-3.5" /> Gerar PDF</GoldButton>
             </div>
           )
         }
@@ -103,7 +118,7 @@ function Proposta() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <BreakdownEmpresa res={res} comodos={comodos} tecidos={tecidos} />
-              <AjustesComercial comercial={comercial} setC={setC} res={res} onSalvar={salvarAjustes} onPDF={baixarPDF} />
+              <AjustesComercial comercial={comercial} setC={setC} res={res} onSalvar={salvarAjustes} onPDF={abrirPDF} />
             </div>
 
             <div>
@@ -120,7 +135,88 @@ function Proposta() {
           <Card>Selecione uma proposta na lista.</Card>
         )}
       </div>
+
+      {proposal && comercial && (
+        <PdfModal
+          open={pdfOpen}
+          onClose={() => setPdfOpen(false)}
+          comodos={comodos}
+          sel={sel}
+          setSel={setSel}
+          comercial={comercial}
+          ctx={ctx}
+          onGerar={gerarComSelecao}
+        />
+      )}
     </>
+  );
+}
+
+// =========================================================
+// Popup: escolher quais cômodos entram no PDF
+// =========================================================
+function PdfModal({ open, onClose, comodos, sel, setSel, comercial, ctx, onGerar }: any) {
+  const selecionados = comodos.filter((_: any, i: number) => sel[i]);
+  const resSel = selecionados.length ? calcularProposta(selecionados, comercial, ctx) : null;
+  const toggle = (i: number) => setSel((s: boolean[]) => s.map((v, idx) => (idx === i ? !v : v)));
+  const todos = () => setSel(comodos.map(() => true));
+  const nenhum = () => setSel(comodos.map(() => false));
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Gerar PDF — selecione os cômodos"
+      footer={
+        <>
+          <GoldButton variant="ghost" onClick={onClose}>Cancelar</GoldButton>
+          <GoldButton onClick={onGerar}>
+            <Download className="w-3.5 h-3.5" /> Gerar PDF ({selecionados.length})
+          </GoldButton>
+        </>
+      }
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[12px] text-muted-foreground">Simule cenários incluindo só os cômodos que quiser.</div>
+        <div className="flex gap-2 text-[11px]">
+          <button onClick={todos} className="text-muted-foreground hover:text-foreground transition-colors">Todos</button>
+          <span className="text-muted-foreground/40">·</span>
+          <button onClick={nenhum} className="text-muted-foreground hover:text-foreground transition-colors">Nenhum</button>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        {comodos.map((c: any, i: number) => {
+          const on = sel[i];
+          return (
+            <button
+              key={i}
+              onClick={() => toggle(i)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-colors ${
+                on ? "border-[oklch(0.80_0.10_88_/_0.35)] bg-[oklch(0.80_0.10_88_/_0.05)]" : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]"
+              }`}
+            >
+              <span className={`w-4 h-4 rounded flex items-center justify-center border shrink-0 ${on ? "bg-[var(--gold)] border-[var(--gold)]" : "border-white/20"}`}>
+                {on && <Check className="w-3 h-3 text-[var(--navy-deep)]" />}
+              </span>
+              <span className="flex items-center gap-2 min-w-0 flex-1">
+                <Home className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span className="text-[13px] truncate">{c.ambiente}</span>
+              </span>
+              <span className="text-[12px] stat text-muted-foreground shrink-0">{formatBRL(c.result.totalFinal)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex items-baseline justify-between mt-5 pt-4 border-t border-white/[0.05]">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Total do cenário</span>
+        <span className="text-[20px] font-medium stat text-gold">{resSel ? formatBRL(resSel.totalFinal) : "—"}</span>
+      </div>
+      {resSel && comercial.parcelas > 1 && (
+        <div className="text-[11px] text-muted-foreground text-right mt-1">{comercial.parcelas}× de <span className="stat">{formatBRL(resSel.valorParcela)}</span></div>
+      )}
+    </Modal>
   );
 }
 
