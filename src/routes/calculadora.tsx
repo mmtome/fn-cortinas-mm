@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Save, AlertTriangle, Minus, Plus, Trash2, Home, Wallet } from "lucide-react";
 
-import { PageHeader, GoldButton, Field, Switch, inputCls, selectCls } from "@/components/ui-kit";
+import { PageHeader, GoldButton, Field, Switch, NumberInput, inputCls, selectCls } from "@/components/ui-kit";
 import {
   calcularProposta,
   defaultComodo,
@@ -308,7 +308,7 @@ function Calculadora() {
                 </select>
               </Field>
               <Field label="Parcelas">
-                <input type="number" inputMode="numeric" min={1} max={18} className={inputCls} value={comercial.parcelas} onChange={(e) => setC({ parcelas: Math.max(1, +e.target.value) })} />
+                <NumberInput value={comercial.parcelas} onChange={(n) => setC({ parcelas: n })} min={1} max={18} integer />
               </Field>
               <div className="md:col-span-2">
                 <Field label={`Desconto · ${comercial.desconto}%`} hint="Aplicado sobre o total da proposta">
@@ -469,7 +469,7 @@ function NumField({ label, v, set, suf }: { label: string; v: number; set: (n: n
           <Minus className="w-3.5 h-3.5" />
         </button>
         <div className="relative flex-1">
-          <input type="number" inputMode="decimal" step={step} className={`${inputCls} text-center ${suf ? "pr-7" : ""}`} value={v} onChange={(e) => set(+e.target.value)} />
+          <NumberInput value={v} onChange={(n) => set(dec(n))} min={0} step={step} className={`${inputCls} text-center ${suf ? "pr-7" : ""}`} />
           {suf && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">{suf}</span>}
         </div>
         <button type="button" onClick={() => set(dec(v + step))} className="w-10 shrink-0 rounded-md border border-white/[0.06] bg-white/[0.03] text-muted-foreground hover:text-foreground active:scale-95 transition flex items-center justify-center" aria-label="Aumentar">

@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -142,6 +142,67 @@ export function Field({
 
 export const inputCls =
   "w-full bg-white/[0.03] border border-white/[0.06] rounded-md px-3 py-2.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[oklch(0.80_0.10_88_/_0.4)] focus:bg-white/[0.04] focus-ring transition-[border-color,background-color,box-shadow] duration-150 ease-premium";
+
+// Input numérico com buffer de texto próprio: permite apagar o dígito e digitar
+// outro (o input controlado por número forçava o valor de volta ao limpar).
+// Só grava valores válidos; ao sair do campo, aplica o mínimo/máximo.
+export function NumberInput({
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  integer = false,
+  className = inputCls,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  integer?: boolean;
+  className?: string;
+}) {
+  const [str, setStr] = useState(String(value));
+  const [focused, setFocused] = useState(false);
+  // Ressincroniza quando o valor muda de fora e o campo não está em edição.
+  if (!focused && str !== String(value)) setStr(String(value));
+
+  const clamp = (n: number) => {
+    if (min != null) n = Math.max(min, n);
+    if (max != null) n = Math.min(max, n);
+    return n;
+  };
+  const parse = (raw: string) => (integer ? parseInt(raw, 10) : parseFloat(raw));
+
+  return (
+    <input
+      type="number"
+      inputMode={integer ? "numeric" : "decimal"}
+      min={min}
+      max={max}
+      step={step}
+      className={className}
+      value={str}
+      onFocus={() => setFocused(true)}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setStr(raw);
+        if (raw !== "") {
+          const n = parse(raw);
+          if (!Number.isNaN(n)) onChange(clamp(n));
+        }
+      }}
+      onBlur={() => {
+        setFocused(false);
+        const n = parse(str);
+        const val = Number.isNaN(n) ? (min ?? 0) : clamp(n);
+        setStr(String(val));
+        onChange(val);
+      }}
+    />
+  );
+}
 
 // Native <select> styled to match the brand: dark popup, light text, gold chevron.
 // `color-scheme: dark` ensures the browser native option list uses dark surface.

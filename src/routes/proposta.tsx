@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, Save, Building2, SlidersHorizontal, Home, Check } from "lucide-react";
 import jsPDF from "jspdf";
 
-import { PageHeader, Card, GoldButton, Modal, Field, selectCls, inputCls, formatDate } from "@/components/ui-kit";
+import { PageHeader, Card, GoldButton, Modal, Field, NumberInput, selectCls, inputCls, formatDate } from "@/components/ui-kit";
 import { useStore, store, useCalcCtx } from "@/lib/store";
 import { calcularProposta, formatBRL, type Tecido, type ComercialInput, type PropostaResult } from "@/lib/pricing-engine";
 import type { ComodoData } from "@/lib/mockData";
@@ -31,6 +31,7 @@ function Proposta() {
   const proposals = useStore((s) => s.proposals);
   const tecidos = useStore((s) => s.tecidos);
   const forros = useStore((s) => s.forros);
+  const blackouts = useStore((s) => s.blackouts);
   const empresa = useStore((s) => s.empresa);
   const ctx = useCalcCtx();
 
@@ -73,7 +74,7 @@ function Proposta() {
     const selecionados = comodos.filter((_, i) => sel[i]);
     if (!selecionados.length) { toast.error("Selecione ao menos um cômodo"); return; }
     const resSel = calcularProposta(selecionados, comercial, ctx);
-    gerarPDF({ proposal, comodos: selecionados, res: resSel, comercial, empresa, validadeISO, tecidos, forros });
+    gerarPDF({ proposal, comodos: selecionados, res: resSel, comercial, empresa, validadeISO, tecidos, forros, blackouts });
     setPdfOpen(false);
     toast.success(`PDF gerado com ${selecionados.length} ${selecionados.length > 1 ? "cômodos" : "cômodo"}`);
   };
@@ -123,7 +124,7 @@ function Proposta() {
 
             <div>
               <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground mb-3">Pré-visualização do PDF</div>
-              <DocumentoPreview proposal={proposal} comodos={comodos} res={res} comercial={comercial} empresa={empresa} validadeISO={validadeISO} tecidos={tecidos} forros={forros} />
+              <DocumentoPreview proposal={proposal} comodos={comodos} res={res} comercial={comercial} empresa={empresa} validadeISO={validadeISO} tecidos={tecidos} forros={forros} blackouts={blackouts} />
             </div>
           </div>
         ) : proposal ? (
@@ -304,7 +305,7 @@ function AjustesComercial({ comercial, setC, res, onSalvar, onPDF }: any) {
             </select>
           </Field>
           <Field label="Parcelas">
-            <input type="number" inputMode="numeric" min={1} max={18} className={inputCls} value={comercial.parcelas} onChange={(e) => setC({ parcelas: Math.max(1, +e.target.value) })} />
+            <NumberInput value={comercial.parcelas} onChange={(n) => setC({ parcelas: n })} min={1} max={18} integer />
           </Field>
         </div>
       </div>
@@ -329,7 +330,7 @@ function AjustesComercial({ comercial, setC, res, onSalvar, onPDF }: any) {
 // =========================================================
 // Pré-visualização do documento (espelha o PDF)
 // =========================================================
-function DocumentoPreview({ proposal, comodos, res, comercial, empresa, validadeISO, tecidos, forros }: any) {
+function DocumentoPreview({ proposal, comodos, res, comercial, empresa, validadeISO, tecidos, forros, blackouts }: any) {
   return (
     <div className="rounded-2xl overflow-hidden border border-white/[0.05] max-w-2xl">
       {/* Capa */}
@@ -365,8 +366,11 @@ function DocumentoPreview({ proposal, comodos, res, comercial, empresa, validade
                   <Spec k="Modelo" v={c.estrutura.modelo} />
                   <Spec k="Tecido" v={nome(tecidos, c.estrutura.tecidoCodigo)} />
                   <Spec k="Forro" v={nome(forros, c.estrutura.forroCodigo, "Sem forro")} />
+                  {c.estrutura.blackoutCodigo != null && (
+                    <Spec k="Blackout" v={nome(blackouts, c.estrutura.blackoutCodigo)} />
+                  )}
                   <Spec k="Trilho" v={r.trilhoInferido} />
-                  <Spec k="Medidas" v={`${r.larguraCortina} × ${c.medidas.alturaParede} m`} />
+                  <Spec k="Medidas" v={`${c.medidas.larguraParede} × ${c.medidas.alturaParede} m`} />
                   <Spec k="Instalação" v={c.instalacao.instalar ? `Inclusa · ${c.instalacao.dificuldade}` : "Não inclusa"} />
                 </dl>
               </div>
@@ -434,7 +438,7 @@ function KV({ k, v, muted }: { k: string; v: string; muted?: boolean }) {
 // =========================================================
 // GERAÇÃO DO PDF — capa + cômodos + total combinado
 // =========================================================
-function gerarPDF({ proposal, comodos, res, comercial, empresa, validadeISO, tecidos, forros }: any) {
+function gerarPDF({ proposal, comodos, res, comercial, empresa, validadeISO, tecidos, forros, blackouts }: any) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const w = doc.internal.pageSize.getWidth();
   const h = doc.internal.pageSize.getHeight();
@@ -497,7 +501,7 @@ function gerarPDF({ proposal, comodos, res, comercial, empresa, validadeISO, tec
   // Cômodos
   comodos.forEach((c: ComodoData, i: number) => {
     const r = res.comodos[i];
-    ensure(132);
+    ensure(c.estrutura.blackoutCodigo != null ? 153 : 132);
 
     doc.setDrawColor(...gold); doc.setLineWidth(0.4); doc.line(M, y, w - M, y); y += 20;
     // Título + valor
@@ -510,8 +514,11 @@ function gerarPDF({ proposal, comodos, res, comercial, empresa, validadeISO, tec
       ["Modelo", c.estrutura.modelo],
       ["Tecido", nome(tecidos, c.estrutura.tecidoCodigo)],
       ["Forro", nome(forros, c.estrutura.forroCodigo, "Sem forro")],
+      ...(c.estrutura.blackoutCodigo != null
+        ? ([["Blackout", nome(blackouts, c.estrutura.blackoutCodigo)]] as [string, string][])
+        : []),
       ["Trilho", r.trilhoInferido],
-      ["Medidas da cortina", `${r.larguraCortina} × ${c.medidas.alturaParede} m`],
+      ["Medidas da cortina", `${c.medidas.larguraParede} × ${c.medidas.alturaParede} m`],
       ["Instalação", c.instalacao.instalar ? `Inclusa · ${c.instalacao.dificuldade}` : "Não inclusa"],
     ];
     doc.setFontSize(10);
