@@ -1,15 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Building2, Layers, SlidersHorizontal, RotateCcw } from "lucide-react";
+import { Plus, Pencil, Trash2, Building2, Layers, SlidersHorizontal, RotateCcw, Shapes } from "lucide-react";
 
-import { PageHeader, GoldButton, Modal, Field, inputCls } from "@/components/ui-kit";
+import { PageHeader, GoldButton, Modal, Field, Switch, inputCls } from "@/components/ui-kit";
 import { useStore, store, type MaterialKind } from "@/lib/store";
-import { DEFAULT_VARS, formatBRL, type Tecido, type Vars } from "@/lib/pricing-engine";
+import { DEFAULT_VARS, formatBRL, type Tecido, type ModeloItem, type Vars } from "@/lib/pricing-engine";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/ajustes")({ component: Ajustes });
 
-type Tab = "empresa" | "materiais" | "variaveis";
+type Tab = "empresa" | "materiais" | "modelos" | "variaveis";
 
 function Ajustes() {
   const [tab, setTab] = useState<Tab>("empresa");
@@ -25,11 +25,13 @@ function Ajustes() {
       <div className="flex gap-1 mb-7 overflow-x-auto -mx-1 px-1">
         <TabBtn active={tab === "empresa"} onClick={() => setTab("empresa")} icon={Building2}>Empresa</TabBtn>
         <TabBtn active={tab === "materiais"} onClick={() => setTab("materiais")} icon={Layers}>Materiais</TabBtn>
+        <TabBtn active={tab === "modelos"} onClick={() => setTab("modelos")} icon={Shapes}>Modelos</TabBtn>
         <TabBtn active={tab === "variaveis"} onClick={() => setTab("variaveis")} icon={SlidersHorizontal}>Variáveis</TabBtn>
       </div>
 
       {tab === "empresa" && <EmpresaTab />}
       {tab === "materiais" && <MateriaisTab />}
+      {tab === "modelos" && <ModelosTab />}
       {tab === "variaveis" && <VariaveisTab />}
     </>
   );
@@ -212,6 +214,93 @@ function MaterialList({ kind, label, blackout }: { kind: MaterialKind; label: st
           </Field>
           <Field label="Preço por metro (R$)">
             <input className={inputCls} inputMode="decimal" value={form.precoMetro} onChange={(e) => setF({ precoMetro: e.target.value })} />
+          </Field>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// =========================================================
+// MODELOS
+// =========================================================
+type ModeloForm = { nome: string; usaCordao: boolean };
+const emptyModelo: ModeloForm = { nome: "", usaCordao: false };
+
+function ModelosTab() {
+  const modelos = useStore((s) => s.modelos);
+  const [open, setOpen] = useState(false);
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [form, setForm] = useState<ModeloForm>(emptyModelo);
+
+  const novo = () => { setEditIdx(null); setForm(emptyModelo); setOpen(true); };
+  const editar = (m: ModeloItem, i: number) => {
+    setEditIdx(i);
+    setForm({ nome: m.nome, usaCordao: m.usaCordao });
+    setOpen(true);
+  };
+
+  const salvar = () => {
+    const nome = form.nome.trim();
+    if (!nome) { toast.error("Informe o nome do modelo"); return; }
+    const dup = modelos.some((m, i) => m.nome.toLowerCase() === nome.toLowerCase() && i !== editIdx);
+    if (dup) { toast.error("Já existe um modelo com este nome"); return; }
+    const item: ModeloItem = { nome, usaCordao: form.usaCordao };
+    if (editIdx != null) { store.updateModelo(editIdx, item); toast.success("Modelo atualizado"); }
+    else { store.addModelo(item); toast.success("Modelo adicionado"); }
+    setOpen(false);
+  };
+
+  const remover = (i: number) => {
+    if (modelos.length <= 1) { toast.error("Mantenha ao menos um modelo"); return; }
+    store.removeModelo(i); toast.success("Removido");
+  };
+
+  return (
+    <div className="max-w-2xl">
+      <div className="surface rounded-2xl p-5 sm:p-6">
+        <div className="flex items-center justify-between mb-1">
+          <div className="text-[13px] font-medium">Modelos <span className="text-muted-foreground">· {modelos.length}</span></div>
+          <GoldButton variant="outline" onClick={novo}><Plus className="w-3.5 h-3.5" /> Adicionar</GoldButton>
+        </div>
+        <div className="text-[12px] text-muted-foreground mb-4">Aparecem na lista de modelos da Calculadora. Modelos marcados com “usa cordão” somam o cordão no orçamento.</div>
+
+        <div className="space-y-1.5">
+          {modelos.map((m, i) => (
+            <div key={i} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+              <div className="min-w-0">
+                <div className="text-[13px] truncate">{m.nome}</div>
+                <div className="text-[11px] text-muted-foreground">{m.usaCordao ? "Com cordão" : "Sem cordão"}</div>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <IconBtn onClick={() => editar(m, i)} label="Editar"><Pencil className="w-3.5 h-3.5" /></IconBtn>
+                <IconBtn onClick={() => remover(i)} label="Excluir" danger><Trash2 className="w-3.5 h-3.5" /></IconBtn>
+              </div>
+            </div>
+          ))}
+          {modelos.length === 0 && <div className="text-[12px] text-muted-foreground py-3">Nenhum modelo cadastrado.</div>}
+        </div>
+      </div>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={editIdx != null ? "Editar modelo" : "Novo modelo"}
+        footer={
+          <>
+            <GoldButton variant="ghost" onClick={() => setOpen(false)}>Cancelar</GoldButton>
+            <GoldButton onClick={salvar}>Salvar</GoldButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="Nome">
+            <input autoFocus className={inputCls} value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} placeholder="Ex: Wave, Prega macho…" />
+          </Field>
+          <Field label="Usa cordão" hint="Some o cordão no orçamento (como o Wave)">
+            <div className="h-[42px] flex items-center">
+              <Switch checked={form.usaCordao} onChange={(v) => setForm((f) => ({ ...f, usaCordao: v }))} label={form.usaCordao ? "Sim" : "Não"} />
+            </div>
           </Field>
         </div>
       </Modal>

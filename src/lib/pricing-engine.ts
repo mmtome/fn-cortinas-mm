@@ -70,8 +70,21 @@ export type FormaPagamento =
   | "Cartão Crédito Parcelado"
   | "Dinheiro";
 
-export type Modelo = "Wave" | "Prega macho" | "Prega americana" | "Persiana";
+export type Modelo = string;
 export type TrilhoTipo = "Varão suíço" | "Trilho simples" | "Trilho duplo";
+
+export interface ModeloItem {
+  nome: string;
+  usaCordao: boolean; // quando true, soma cordão no orçamento (como o "Wave")
+}
+
+// Modelos iniciais (seed). Editáveis em Ajustes → Modelos.
+export const CATALOGO_MODELOS: ModeloItem[] = [
+  { nome: "Wave", usaCordao: true },
+  { nome: "Prega macho", usaCordao: false },
+  { nome: "Prega americana", usaCordao: false },
+  { nome: "Persiana", usaCordao: false },
+];
 
 export interface Tecido {
   codigo: number;
@@ -155,6 +168,7 @@ export interface CalcCtx {
   tecidos?: Tecido[];
   forros?: Tecido[];
   blackouts?: Tecido[];
+  modelos?: ModeloItem[];
   vars?: Partial<Vars>;
 }
 
@@ -287,6 +301,7 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
   const tecidos = ctx.tecidos ?? CATALOGO_TECIDOS;
   const forros = ctx.forros ?? CATALOGO_FORROS;
   const blackouts = ctx.blackouts ?? CATALOGO_BLACKOUTS;
+  const modelos = ctx.modelos ?? CATALOGO_MODELOS;
 
   const tecido = tecidos.find((t) => t.codigo === estrutura.tecidoCodigo) ?? tecidos[0];
   const forro = estrutura.forroCodigo != null
@@ -343,8 +358,11 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
   // Entretela acompanha a largura franzida (zero se o próprio tecido é blackout).
   const mtsEntretela = tecido && tecido.blackout ? 0 : larguraFranzida;
 
-  // Cordão (somente Wave) conforme o cabeçalho.
-  const mtsCordao = estrutura.modelo === "Wave" ? +(L * v.fatorCordao).toFixed(2) : 0;
+  // Cordão: só nos modelos marcados como "usa cordão" (Wave e afins).
+  // Fallback para modelos fora do catálogo: mantém a regra antiga (só "Wave").
+  const modeloAtual = modelos.find((m) => m.nome === estrutura.modelo);
+  const usaCordao = modeloAtual ? modeloAtual.usaCordao : estrutura.modelo === "Wave";
+  const mtsCordao = usaCordao ? +(L * v.fatorCordao).toFixed(2) : 0;
 
   // Presilhas/rodízios: qtd por metro × largura.
   const qtdRodizios = Math.ceil(L * v.rodiziosPorMetro);

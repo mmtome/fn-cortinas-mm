@@ -23,7 +23,6 @@ const AMBIENTES = [
   "Home Theater", "Home Office", "Biblioteca", "Lavabo", "Cozinha Gourmet",
   "Varanda Gourmet", "Sacada Panorâmica", "Hall de Entrada", "Showroom", "Quarto",
 ];
-const MODELOS = ["Wave", "Prega macho", "Prega americana", "Persiana"] as const;
 const FORMAS = ["Pix", "Cartão Débito", "Cartão Crédito 1x", "Cartão Crédito Parcelado", "Dinheiro"] as const;
 
 function Calculadora() {
@@ -32,6 +31,7 @@ function Calculadora() {
   const tecidos = useStore((s) => s.tecidos);
   const forros = useStore((s) => s.forros);
   const blackouts = useStore((s) => s.blackouts);
+  const modelos = useStore((s) => s.modelos);
   const ctx = useCalcCtx();
 
   const [cliente, setCliente] = useState("");
@@ -231,8 +231,11 @@ function Calculadora() {
             <Section title="Estrutura, tecidos e acabamentos">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <Field label="Modelo">
-                  <select className={selectCls} value={comodo.estrutura.modelo} onChange={(e) => setEstrutura({ modelo: e.target.value as any })}>
-                    {MODELOS.map((m) => <option key={m}>{m}</option>)}
+                  <select className={selectCls} value={comodo.estrutura.modelo} onChange={(e) => setEstrutura({ modelo: e.target.value })}>
+                    {modelos.map((m) => <option key={m.nome}>{m.nome}</option>)}
+                    {!modelos.some((m) => m.nome === comodo.estrutura.modelo) && (
+                      <option value={comodo.estrutura.modelo}>{comodo.estrutura.modelo}</option>
+                    )}
                   </select>
                 </Field>
                 <Field label="Motorizada" hint="Acionamento elétrico">

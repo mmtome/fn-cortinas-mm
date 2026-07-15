@@ -5,8 +5,10 @@ import {
   CATALOGO_TECIDOS,
   CATALOGO_FORROS,
   CATALOGO_BLACKOUTS,
+  CATALOGO_MODELOS,
   DEFAULT_VARS,
   type Tecido,
+  type ModeloItem,
   type Vars,
   type CalcCtx,
 } from "./pricing-engine";
@@ -37,6 +39,7 @@ type State = {
   tecidos: Tecido[];
   forros: Tecido[];
   blackouts: Tecido[];
+  modelos: ModeloItem[];
   vars: Vars;
   empresa: Empresa;
 };
@@ -52,6 +55,7 @@ function defaultState(): State {
     tecidos: CATALOGO_TECIDOS,
     forros: CATALOGO_FORROS,
     blackouts: CATALOGO_BLACKOUTS,
+    modelos: CATALOGO_MODELOS.map((m) => ({ ...m })),
     vars: { ...DEFAULT_VARS },
     empresa: { ...defaultEmpresa },
   };
@@ -132,6 +136,7 @@ function hydrate() {
       tecidos: saved.tecidos ?? base.tecidos,
       forros: saved.forros ?? base.forros,
       blackouts: saved.blackouts ?? base.blackouts,
+      modelos: saved.modelos ?? base.modelos,
       // mescla vars para não perder chaves novas em versões futuras
       vars: { ...base.vars, ...saved.vars },
       empresa: { ...base.empresa, ...saved.empresa },
@@ -262,6 +267,17 @@ export const store = {
     commit({ ...state, [kind]: state[kind].filter((t) => t.codigo !== codigo) } as State);
   },
 
+  // ---- Modelos ----
+  addModelo: (m: ModeloItem) => {
+    commit({ ...state, modelos: [...state.modelos, m] });
+  },
+  updateModelo: (index: number, patch: Partial<ModeloItem>) => {
+    commit({ ...state, modelos: state.modelos.map((m, i) => (i === index ? { ...m, ...patch } : m)) });
+  },
+  removeModelo: (index: number) => {
+    commit({ ...state, modelos: state.modelos.filter((_, i) => i !== index) });
+  },
+
   // ---- Variáveis ----
   updateVars: (patch: Partial<Vars>) => {
     commit({ ...state, vars: { ...state.vars, ...patch } });
@@ -300,6 +316,7 @@ export function useCalcCtx(): CalcCtx {
   const tecidos = useStore((s) => s.tecidos);
   const forros = useStore((s) => s.forros);
   const blackouts = useStore((s) => s.blackouts);
+  const modelos = useStore((s) => s.modelos);
   const vars = useStore((s) => s.vars);
-  return useMemo(() => ({ tecidos, forros, blackouts, vars }), [tecidos, forros, blackouts, vars]);
+  return useMemo(() => ({ tecidos, forros, blackouts, modelos, vars }), [tecidos, forros, blackouts, modelos, vars]);
 }
