@@ -4,7 +4,7 @@ import { Download, Save, Building2, SlidersHorizontal, Home, Check } from "lucid
 import jsPDF from "jspdf";
 
 import { PageHeader, Card, GoldButton, Modal, Field, NumberInput, selectCls, inputCls, formatDate } from "@/components/ui-kit";
-import { useStore, store, useCalcCtx } from "@/lib/store";
+import { useStore, store, useCalcCtx, useMateriais } from "@/lib/store";
 import { calcularProposta, calcularOrcamento, formatBRL, type Tecido, type ComercialInput, type PropostaResult, type OpcaoResult } from "@/lib/pricing-engine";
 import type { ComodoData } from "@/lib/mockData";
 import { gerarQRWhatsApp, whatsappUrl } from "@/lib/qr";
@@ -43,9 +43,7 @@ function instaUrl(v: string) {
 function Proposta() {
   const { id } = Route.useSearch();
   const proposals = useStore((s) => s.proposals);
-  const tecidos = useStore((s) => s.tecidos);
-  const forros = useStore((s) => s.forros);
-  const blackouts = useStore((s) => s.blackouts);
+  const { tecidos, forros, blackouts } = useMateriais();
   const empresa = useStore((s) => s.empresa);
   const ctx = useCalcCtx();
 

@@ -1,38 +1,40 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Building2, Layers, SlidersHorizontal, RotateCcw, Shapes } from "lucide-react";
+import { Plus, Pencil, Trash2, Building2, SlidersHorizontal, RotateCcw, Shapes, Users } from "lucide-react";
 
-import { PageHeader, GoldButton, Modal, Field, Switch, inputCls } from "@/components/ui-kit";
-import { useStore, store, type MaterialKind } from "@/lib/store";
-import { DEFAULT_VARS, formatBRL, type Tecido, type ModeloItem, type Vars } from "@/lib/pricing-engine";
+import { PageHeader, GoldButton, Modal, Field, Switch, inputCls, selectCls } from "@/components/ui-kit";
+import { useStore, store } from "@/lib/store";
+import { useAuth, authStore, type Nivel, type Usuario } from "@/lib/auth";
+import { DEFAULT_VARS, type ModeloItem, type Vars } from "@/lib/pricing-engine";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/ajustes")({ component: Ajustes });
 
-type Tab = "empresa" | "materiais" | "modelos" | "variaveis";
+type Tab = "empresa" | "modelos" | "variaveis" | "usuarios";
 
 function Ajustes() {
   const [tab, setTab] = useState<Tab>("empresa");
+  const { isAdmin } = useAuth();
 
   return (
     <>
       <PageHeader
         eyebrow="Configurações"
         title="Ajustes"
-        subtitle="Cadastre manualmente materiais, variáveis de preço e os dados da empresa."
+        subtitle="Modelos, cores, variáveis de preço e os dados da empresa. Os materiais ficam no Estoque."
       />
 
       <div className="flex gap-1 mb-7 overflow-x-auto -mx-1 px-1">
         <TabBtn active={tab === "empresa"} onClick={() => setTab("empresa")} icon={Building2}>Empresa</TabBtn>
-        <TabBtn active={tab === "materiais"} onClick={() => setTab("materiais")} icon={Layers}>Materiais</TabBtn>
-        <TabBtn active={tab === "modelos"} onClick={() => setTab("modelos")} icon={Shapes}>Modelos</TabBtn>
+        <TabBtn active={tab === "modelos"} onClick={() => setTab("modelos")} icon={Shapes}>Modelos e cores</TabBtn>
         <TabBtn active={tab === "variaveis"} onClick={() => setTab("variaveis")} icon={SlidersHorizontal}>Variáveis</TabBtn>
+        {isAdmin && <TabBtn active={tab === "usuarios"} onClick={() => setTab("usuarios")} icon={Users}>Usuários</TabBtn>}
       </div>
 
       {tab === "empresa" && <EmpresaTab />}
-      {tab === "materiais" && <MateriaisTab />}
-      {tab === "modelos" && <ModelosTab />}
+      {tab === "modelos" && <div className="space-y-6"><ModelosTab /><CoresCard /></div>}
       {tab === "variaveis" && <VariaveisTab />}
+      {tab === "usuarios" && isAdmin && <UsuariosTab />}
     </>
   );
 }
@@ -125,23 +127,8 @@ function EmpresaTab() {
 }
 
 // =========================================================
-// MATERIAIS (catálogos)
+// CORES (lista global)
 // =========================================================
-const KINDS: { key: MaterialKind; label: string; blackout?: boolean }[] = [
-  { key: "tecidos", label: "Tecidos" },
-  { key: "forros", label: "Forros" },
-  { key: "blackouts", label: "Blackouts", blackout: true },
-];
-
-function MateriaisTab() {
-  return (
-    <div className="space-y-6">
-      {KINDS.map((k) => <MaterialList key={k.key} kind={k.key} label={k.label} blackout={k.blackout} />)}
-      <CoresCard />
-    </div>
-  );
-}
-
 function CoresCard() {
   const cores = useStore((s) => s.cores);
   const [nova, setNova] = useState("");
@@ -172,91 +159,67 @@ function CoresCard() {
   );
 }
 
-type MatForm = { codigo: string; nome: string; largura: string; precoMetro: string };
-const emptyMat: MatForm = { codigo: "", nome: "", largura: "3", precoMetro: "23" };
+// =========================================================
+// USUÁRIOS (trava simples — não é segurança real)
+// =========================================================
+type UserForm = { nome: string; usuario: string; senha: string; nivel: Nivel };
+const emptyUser: UserForm = { nome: "", usuario: "", senha: "", nivel: "Operador" };
 
-function MaterialList({ kind, label, blackout }: { kind: MaterialKind; label: string; blackout?: boolean }) {
-  const items = useStore((s) => s[kind]);
+function UsuariosTab() {
+  const { usuarios, usuario: atual } = useAuth();
   const [open, setOpen] = useState(false);
-  const [editCod, setEditCod] = useState<number | null>(null);
-  const [form, setForm] = useState<MatForm>(emptyMat);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState<UserForm>(emptyUser);
 
-  const novo = () => { setEditCod(null); setForm(emptyMat); setOpen(true); };
-  const editar = (t: Tecido) => {
-    setEditCod(t.codigo);
-    setForm({ codigo: String(t.codigo), nome: t.nome, largura: String(t.largura), precoMetro: String(t.precoMetro) });
-    setOpen(true);
-  };
-
+  const novo = () => { setEditId(null); setForm(emptyUser); setOpen(true); };
+  const editar = (u: Usuario) => { setEditId(u.id); setForm({ nome: u.nome, usuario: u.usuario, senha: u.senha, nivel: u.nivel }); setOpen(true); };
   const salvar = () => {
-    const codigo = Number(form.codigo);
-    if (!form.nome.trim()) { toast.error("Informe o nome"); return; }
-    if (!form.codigo.trim() || Number.isNaN(codigo)) { toast.error("Informe um código numérico"); return; }
-    if (editCod == null && items.some((t) => t.codigo === codigo)) {
-      toast.error("Já existe um material com este código"); return;
-    }
-    const mat: Tecido = {
-      codigo, nome: form.nome.trim(),
-      largura: Number(form.largura) || 0,
-      precoMetro: Number(form.precoMetro) || 0,
-      ...(blackout ? { blackout: true } : {}),
-    };
-    if (editCod != null) { store.updateMaterial(kind, editCod, mat); toast.success("Material atualizado"); }
-    else { store.addMaterial(kind, mat); toast.success("Material adicionado"); }
+    if (!form.nome.trim() || !form.usuario.trim() || !form.senha.trim()) { toast.error("Preencha nome, usuário e senha"); return; }
+    if (authStore.usuarioExiste(form.usuario, editId ?? undefined)) { toast.error("Já existe um usuário com esse login"); return; }
+    const dados = { nome: form.nome.trim(), usuario: form.usuario.trim(), senha: form.senha, nivel: form.nivel };
+    if (editId) { authStore.updateUsuario(editId, dados); toast.success("Usuário atualizado"); }
+    else { authStore.addUsuario(dados); toast.success("Usuário adicionado"); }
     setOpen(false);
   };
-
-  const setF = (patch: Partial<MatForm>) => setForm((f) => ({ ...f, ...patch }));
+  const remover = (u: Usuario) => {
+    if (!authStore.removeUsuario(u.id)) { toast.error("Precisa haver ao menos um Admin"); return; }
+    toast.success("Usuário removido");
+  };
+  const setF = (patch: Partial<UserForm>) => setForm((f) => ({ ...f, ...patch }));
 
   return (
-    <div className="surface rounded-2xl p-5 sm:p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-[13px] font-medium">{label} <span className="text-muted-foreground">· {items.length}</span></div>
-        <GoldButton variant="outline" onClick={novo}><Plus className="w-3.5 h-3.5" /> Adicionar</GoldButton>
+    <div className="max-w-2xl space-y-4">
+      <div className="rounded-lg border border-[oklch(0.80_0.12_85_/_0.2)] bg-[oklch(0.80_0.12_85_/_0.04)] px-3 py-2.5 text-[11px] text-gold leading-relaxed">
+        Trava de acesso local (ainda não é segurança real). Os níveis controlam o que cada um vê: <b>Admin</b> vê tudo; <b>Operador</b> não acessa os Ajustes.
+      </div>
+      <div className="surface rounded-2xl p-5 sm:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-[13px] font-medium">Usuários <span className="text-muted-foreground">· {usuarios.length}</span></div>
+          <GoldButton variant="outline" onClick={novo}><Plus className="w-3.5 h-3.5" /> Adicionar</GoldButton>
+        </div>
+        <div className="space-y-1.5">
+          {usuarios.map((u) => (
+            <div key={u.id} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-white/[0.02]">
+              <div className="min-w-0">
+                <div className="text-[13px] truncate">{u.nome} {atual?.id === u.id && <span className="text-[10px] text-muted-foreground">(você)</span>}</div>
+                <div className="text-[11px] text-muted-foreground">@{u.usuario} · {u.nivel}</div>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <IconBtn onClick={() => editar(u)} label="Editar"><Pencil className="w-3.5 h-3.5" /></IconBtn>
+                <IconBtn onClick={() => remover(u)} label="Excluir" danger><Trash2 className="w-3.5 h-3.5" /></IconBtn>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="space-y-1.5">
-        {items.map((t) => (
-          <div key={t.codigo} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
-            <div className="min-w-0">
-              <div className="text-[13px] truncate">{t.nome}</div>
-              <div className="text-[11px] text-muted-foreground">#{t.codigo} · {t.largura}m · {formatBRL(t.precoMetro)}/m</div>
-            </div>
-            <div className="flex gap-1 shrink-0">
-              <IconBtn onClick={() => editar(t)} label="Editar"><Pencil className="w-3.5 h-3.5" /></IconBtn>
-              <IconBtn onClick={() => { store.removeMaterial(kind, t.codigo); toast.success("Removido"); }} label="Excluir" danger><Trash2 className="w-3.5 h-3.5" /></IconBtn>
-            </div>
-          </div>
-        ))}
-        {items.length === 0 && <div className="text-[12px] text-muted-foreground py-3">Nenhum material cadastrado.</div>}
-      </div>
-
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title={editCod != null ? `Editar ${label.toLowerCase().slice(0, -1)}` : `Novo ${label.toLowerCase().slice(0, -1)}`}
-        footer={
-          <>
-            <GoldButton variant="ghost" onClick={() => setOpen(false)}>Cancelar</GoldButton>
-            <GoldButton onClick={salvar}>Salvar</GoldButton>
-          </>
-        }
-      >
+      <Modal open={open} onClose={() => setOpen(false)} title={editId ? "Editar usuário" : "Novo usuário"}
+        footer={<><GoldButton variant="ghost" onClick={() => setOpen(false)}>Cancelar</GoldButton><GoldButton onClick={salvar}>Salvar</GoldButton></>}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2">
-            <Field label="Nome">
-              <input autoFocus className={inputCls} value={form.nome} onChange={(e) => setF({ nome: e.target.value })} placeholder="Ex: Voil Bruxelas Areia" />
-            </Field>
-          </div>
-          <Field label="Código" hint="Identificador numérico único">
-            <input className={inputCls} inputMode="numeric" value={form.codigo} onChange={(e) => setF({ codigo: e.target.value })} disabled={editCod != null} placeholder="Ex: 1130" />
-          </Field>
-          <Field label="Largura (m)">
-            <input className={inputCls} inputMode="decimal" value={form.largura} onChange={(e) => setF({ largura: e.target.value })} />
-          </Field>
-          <Field label="Preço por metro (R$)">
-            <input className={inputCls} inputMode="decimal" value={form.precoMetro} onChange={(e) => setF({ precoMetro: e.target.value })} />
-          </Field>
+          <div className="sm:col-span-2"><Field label="Nome"><input autoFocus className={inputCls} value={form.nome} onChange={(e) => setF({ nome: e.target.value })} placeholder="Ex: Maria" /></Field></div>
+          <Field label="Usuário (login)"><input className={inputCls} value={form.usuario} onChange={(e) => setF({ usuario: e.target.value })} placeholder="ex: maria" /></Field>
+          <Field label="Senha"><input type="password" className={inputCls} value={form.senha} onChange={(e) => setF({ senha: e.target.value })} placeholder="••••••••" /></Field>
+          <Field label="Nível"><select className={selectCls} value={form.nivel} onChange={(e) => setF({ nivel: e.target.value as Nivel })}><option>Admin</option><option>Operador</option></select></Field>
         </div>
       </Modal>
     </div>

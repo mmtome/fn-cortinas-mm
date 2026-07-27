@@ -2,9 +2,6 @@ import { useMemo, useSyncExternalStore } from "react";
 import { initialProposals, initialStock, type Proposal, type ProposalStatus, type StockItem } from "./mockData";
 import { ambienteLabel } from "./pricing-engine";
 import {
-  CATALOGO_TECIDOS,
-  CATALOGO_FORROS,
-  CATALOGO_BLACKOUTS,
   CATALOGO_MODELOS,
   CATALOGO_CORES,
   DEFAULT_VARS,
@@ -42,27 +39,21 @@ export const defaultEmpresa: Empresa = {
 // -------------------- Estado --------------------
 type State = {
   proposals: Proposal[];
-  stock: StockItem[];
-  tecidos: Tecido[];
-  forros: Tecido[];
-  blackouts: Tecido[];
+  stock: StockItem[];       // fonte única: tecidos/forros/blackouts saem daqui
   modelos: ModeloItem[];
   cores: string[];
   vars: Vars;
   empresa: Empresa;
 };
 
-// v2: novos status (Pendente/Aprovado/Perdido), campos endereço/contato e
-// faturamento zerado. Bump da versão recomeça do zero para testes.
-const STORAGE_KEY = "fn-cortinas:v2";
+// v3: estoque vira fonte única dos materiais (tecidos/forros/blackouts derivam
+// do estoque). Mudança estrutural — recomeça do seed novo.
+const STORAGE_KEY = "fn-cortinas:v3";
 
 function defaultState(): State {
   return {
     proposals: initialProposals,
     stock: initialStock,
-    tecidos: CATALOGO_TECIDOS,
-    forros: CATALOGO_FORROS,
-    blackouts: CATALOGO_BLACKOUTS,
     modelos: CATALOGO_MODELOS.map((m) => ({ ...m })),
     cores: [...CATALOGO_CORES],
     vars: { ...DEFAULT_VARS },
@@ -154,9 +145,6 @@ function hydrate() {
     state = {
       proposals: saved.proposals ? saved.proposals.map(migrateProposal) : base.proposals,
       stock: saved.stock ?? base.stock,
-      tecidos: saved.tecidos ?? base.tecidos,
-      forros: saved.forros ?? base.forros,
-      blackouts: saved.blackouts ?? base.blackouts,
       modelos: saved.modelos ?? base.modelos,
       cores: saved.cores ?? base.cores,
       // mescla vars para não perder chaves novas em versões futuras
@@ -181,34 +169,33 @@ let seq = 0;
 const uid = (prefix: string) =>
   `${prefix}${Date.now().toString(36)}${(seq++).toString(36)}`;
 
-// -------------------- Estoque ⇄ Catálogo de materiais --------------------
-// Itens de estoque nessas categorias também viram opção na Calculadora.
-const KIND_OF: Partial<Record<StockItem["categoria"], MaterialKind>> = {
+// -------------------- Estoque = fonte única dos materiais --------------------
+// Tecidos/forros/blackouts da calculadora são DERIVADOS dos itens de estoque
+// dessas categorias (custo = R$/m, largura = largura do rolo). Um só lugar.
+const CAT_KIND: Partial<Record<StockItem["categoria"], MaterialKind>> = {
   Tecido: "tecidos",
   Forro: "forros",
   Blackout: "blackouts",
 };
+const isMaterialCat = (c: StockItem["categoria"]) => c in CAT_KIND;
 
-function proximoCodigo(s: State): number {
-  const todos = [...s.tecidos, ...s.forros, ...s.blackouts].map((t) => t.codigo);
-  return (todos.length ? Math.max(...todos) : 8999) + 1;
+/** Deriva os catálogos (tecidos/forros/blackouts) a partir do estoque. */
+export function materiaisDoEstoque(stock: StockItem[]) {
+  const pick = (cat: StockItem["categoria"], blackout?: boolean): Tecido[] =>
+    stock
+      .filter((s) => s.categoria === cat && s.codigo != null)
+      .map((s) => ({ codigo: s.codigo!, nome: s.nome, largura: s.largura ?? 3, precoMetro: s.custo, ...(blackout ? { blackout: true } : {}) }));
+  return { tecidos: pick("Tecido"), forros: pick("Forro"), blackouts: pick("Blackout", true) };
 }
 
-/** Reflete um item de estoque (tecido/forro/blackout) no catálogo da calculadora. */
-function syncMaterial(s: State, item: StockItem): State {
-  const kind = KIND_OF[item.categoria];
-  if (!kind || item.codigo == null) return s;
-  const mat: Tecido = {
-    codigo: item.codigo,
-    nome: item.nome,
-    largura: 3,
-    precoMetro: item.custo,
-    ...(kind === "blackouts" ? { blackout: true } : {}),
-  };
-  const list = s[kind];
-  const exists = list.some((t) => t.codigo === item.codigo);
-  const nextList = exists ? list.map((t) => (t.codigo === item.codigo ? { ...t, ...mat } : t)) : [...list, mat];
-  return { ...s, [kind]: nextList } as State;
+function proximoCodigo(stock: StockItem[]): number {
+  return Math.max(8999, ...stock.map((s) => s.codigo ?? 0)) + 1;
+}
+
+/** Evita duplicar: se já existe item da mesma categoria com esse nome, devolve o código dele. */
+function codigoPorNome(stock: StockItem[], categoria: StockItem["categoria"], nome: string): number | null {
+  const alvo = nome.trim().toLowerCase();
+  return stock.find((s) => s.categoria === categoria && s.nome.trim().toLowerCase() === alvo)?.codigo ?? null;
 }
 
 // -------------------- Store API --------------------
@@ -247,47 +234,25 @@ export const store = {
     store.upsertProposal(copy);
   },
 
-  // ---- Estoque (sincroniza materiais com o catálogo da calculadora) ----
+  // ---- Estoque (fonte única dos materiais) ----
   addStock: (item: Omit<StockItem, "id">) => {
-    const kind = KIND_OF[item.categoria];
-    const codigo = kind && item.codigo == null ? proximoCodigo(state) : item.codigo;
+    const codigo = isMaterialCat(item.categoria) && item.codigo == null
+      ? codigoPorNome(state.stock, item.categoria, item.nome) ?? proximoCodigo(state.stock)
+      : item.codigo;
     const stockItem: StockItem = { ...item, codigo, id: uid("s") };
-    commit(syncMaterial({ ...state, stock: [stockItem, ...state.stock] }, stockItem));
+    commit({ ...state, stock: [stockItem, ...state.stock] });
   },
   updateStock: (id: string, patch: Partial<StockItem>) => {
     let stock = state.stock.map((s) => (s.id === id ? { ...s, ...patch } : s));
-    let item = stock.find((s) => s.id === id);
-    if (item && KIND_OF[item.categoria] && item.codigo == null) {
-      const codigo = proximoCodigo(state);
+    const item = stock.find((s) => s.id === id);
+    if (item && isMaterialCat(item.categoria) && item.codigo == null) {
+      const codigo = codigoPorNome(state.stock, item.categoria, item.nome) ?? proximoCodigo(state.stock);
       stock = stock.map((s) => (s.id === id ? { ...s, codigo } : s));
-      item = { ...item, codigo };
     }
-    let next: State = { ...state, stock };
-    if (item) next = syncMaterial(next, item);
-    commit(next);
+    commit({ ...state, stock });
   },
   removeStock: (id: string) => {
-    const item = state.stock.find((s) => s.id === id);
-    let next: State = { ...state, stock: state.stock.filter((s) => s.id !== id) };
-    const kind = item ? KIND_OF[item.categoria] : undefined;
-    if (item && kind && item.codigo != null) {
-      next = { ...next, [kind]: next[kind].filter((t) => t.codigo !== item.codigo) } as State;
-    }
-    commit(next);
-  },
-
-  // ---- Materiais (catálogos) ----
-  addMaterial: (kind: MaterialKind, m: Tecido) => {
-    commit({ ...state, [kind]: [...state[kind], m] } as State);
-  },
-  updateMaterial: (kind: MaterialKind, codigo: number, patch: Partial<Tecido>) => {
-    commit({
-      ...state,
-      [kind]: state[kind].map((t) => (t.codigo === codigo ? { ...t, ...patch } : t)),
-    } as State);
-  },
-  removeMaterial: (kind: MaterialKind, codigo: number) => {
-    commit({ ...state, [kind]: state[kind].filter((t) => t.codigo !== codigo) } as State);
+    commit({ ...state, stock: state.stock.filter((s) => s.id !== id) });
   },
 
   // ---- Modelos ----
@@ -344,12 +309,16 @@ export function useStore<T>(selector: (s: State) => T): T {
   );
 }
 
+/** Catálogos de materiais derivados do estoque (para os seletores da calculadora). */
+export function useMateriais() {
+  const stock = useStore((s) => s.stock);
+  return useMemo(() => materiaisDoEstoque(stock), [stock]);
+}
+
 /** Contexto de cálculo a partir do estado atual (catálogos + variáveis). */
 export function useCalcCtx(): CalcCtx {
-  const tecidos = useStore((s) => s.tecidos);
-  const forros = useStore((s) => s.forros);
-  const blackouts = useStore((s) => s.blackouts);
+  const stock = useStore((s) => s.stock);
   const modelos = useStore((s) => s.modelos);
   const vars = useStore((s) => s.vars);
-  return useMemo(() => ({ tecidos, forros, blackouts, modelos, vars }), [tecidos, forros, blackouts, modelos, vars]);
+  return useMemo(() => ({ ...materiaisDoEstoque(stock), modelos, vars }), [stock, modelos, vars]);
 }

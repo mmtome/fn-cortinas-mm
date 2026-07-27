@@ -1,7 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Calculator, FolderOpen, FileText, Package, SlidersHorizontal } from "lucide-react";
+import { LayoutDashboard, Calculator, FolderOpen, FileText, Package, SlidersHorizontal, LogOut } from "lucide-react";
 import { store } from "@/lib/store";
+import { useAuth, authStore } from "@/lib/auth";
+import { LoginScreen } from "@/components/LoginScreen";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, short: "Início" },
@@ -9,11 +11,8 @@ const nav = [
   { to: "/registros", label: "Registros", icon: FolderOpen, short: "Registros" },
   { to: "/proposta", label: "Propostas", icon: FileText, short: "Propostas" },
   { to: "/estoque", label: "Estoque", icon: Package, short: "Estoque" },
-  { to: "/ajustes", label: "Ajustes", icon: SlidersHorizontal, short: "Ajustes" },
+  { to: "/ajustes", label: "Ajustes", icon: SlidersHorizontal, short: "Ajustes", adminOnly: true },
 ] as const;
-
-// Itens prioritários na barra inferior do mobile (Ajustes fica no header).
-const mobileNav = nav.filter((n) => n.to !== "/ajustes");
 
 function isActive(pathname: string, to: string) {
   return pathname === to || (to !== "/" && pathname.startsWith(to));
@@ -21,11 +20,28 @@ function isActive(pathname: string, to: string) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const [mounted, setMounted] = useState(false);
+  const { usuario, isAdmin } = useAuth();
 
   // Carrega dados salvos no navegador depois da hidratação.
   useEffect(() => {
     store.hydrate();
+    setMounted(true);
   }, []);
+
+  // Evita flash de hidratação (server não conhece a sessão do navegador).
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--navy-deep)]">
+        <img src="/logo-fn.png" alt="" className="w-14 h-14 object-contain opacity-80 animate-pulse" />
+      </div>
+    );
+  }
+
+  if (!usuario) return <LoginScreen />;
+
+  const visibleNav = nav.filter((n) => !("adminOnly" in n && n.adminOnly) || isAdmin);
+  const mobileNav = visibleNav.filter((n) => n.to !== "/ajustes");
 
   return (
     <div className="min-h-screen flex w-full">
@@ -39,7 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-          {nav.map(({ to, label, icon: Icon }) => {
+          {visibleNav.map(({ to, label, icon: Icon }) => {
             const active = isActive(pathname, to);
             return (
               <Link
@@ -63,9 +79,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="px-6 py-5 border-t border-white/[0.05]">
-          <div className="text-[11px] text-muted-foreground">Atelier Premium</div>
-          <div className="text-[11px] text-muted-foreground/60 mt-0.5">v1.1</div>
+        <div className="px-4 py-4 border-t border-white/[0.05]">
+          <div className="flex items-center justify-between gap-2 px-2">
+            <div className="min-w-0">
+              <div className="text-[12px] font-medium truncate">{usuario.nome}</div>
+              <div className="text-[10px] text-muted-foreground">{usuario.nivel}</div>
+            </div>
+            <button
+              onClick={() => authStore.logout()}
+              className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors shrink-0"
+              aria-label="Sair"
+              title="Sair"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -76,15 +104,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <img src="/logo-fn.png" alt="FN Cortinas" className="w-7 h-7 object-contain" />
             <span className="text-[13px] font-medium">FN Cortinas</span>
           </div>
-          <Link
-            to="/ajustes"
-            aria-label="Ajustes"
-            className={`p-2 rounded-md transition-colors ${
-              isActive(pathname, "/ajustes") ? "text-gold bg-white/[0.05]" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <SlidersHorizontal className="w-[18px] h-[18px]" />
-          </Link>
+          <div className="flex items-center gap-1">
+            {isAdmin && (
+              <Link
+                to="/ajustes"
+                aria-label="Ajustes"
+                className={`p-2 rounded-md transition-colors ${
+                  isActive(pathname, "/ajustes") ? "text-gold bg-white/[0.05]" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <SlidersHorizontal className="w-[18px] h-[18px]" />
+              </Link>
+            )}
+            <button onClick={() => authStore.logout()} aria-label="Sair" className="p-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">
+              <LogOut className="w-[18px] h-[18px]" />
+            </button>
+          </div>
         </header>
 
         <div
@@ -97,7 +132,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* ===== Tab bar mobile ===== */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-white/[0.06] bg-[var(--background)]/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-5">
+        <div className="grid" style={{ gridTemplateColumns: `repeat(${mobileNav.length}, minmax(0, 1fr))` }}>
           {mobileNav.map(({ to, short, icon: Icon }) => {
             const active = isActive(pathname, to);
             return (

@@ -14,7 +14,7 @@ import {
   type EstruturaInput,
   type ComercialInput,
 } from "@/lib/pricing-engine";
-import { useStore, store, useCalcCtx } from "@/lib/store";
+import { useStore, store, useCalcCtx, useMateriais } from "@/lib/store";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/calculadora")({ component: Calculadora });
@@ -28,9 +28,7 @@ const FORMAS = ["Pix", "Cartão Débito", "Cartão Crédito 1x", "Cartão Crédi
 
 function Calculadora() {
   const navigate = useNavigate();
-  const tecidos = useStore((s) => s.tecidos);
-  const forros = useStore((s) => s.forros);
-  const blackouts = useStore((s) => s.blackouts);
+  const { tecidos, forros, blackouts } = useMateriais();
   const modelos = useStore((s) => s.modelos);
   const cores = useStore((s) => s.cores);
   const proposals = useStore((s) => s.proposals);
