@@ -75,11 +75,11 @@ function EmpresaTab() {
           <Field label="Telefone">
             <input className={inputCls} value={form.telefone} onChange={(e) => setF({ telefone: e.target.value })} placeholder="(11) 99999-9999" />
           </Field>
-          <Field label="WhatsApp (p/ QR Code)" hint="Só números, com DDD. Ex: 5534999999999">
-            <input className={inputCls} value={form.whatsapp} onChange={(e) => setF({ whatsapp: e.target.value })} placeholder="5534999999999" />
+          <Field label="WhatsApp (p/ QR Code)" hint="Número com DDD ou link (wa.me/…)">
+            <input className={inputCls} value={form.whatsapp} onChange={(e) => setF({ whatsapp: e.target.value })} placeholder="https://wa.me/message/… ou 5534999999999" />
           </Field>
-          <Field label="Instagram">
-            <input className={inputCls} value={form.instagram} onChange={(e) => setF({ instagram: e.target.value })} placeholder="@fncortinas" />
+          <Field label="Instagram" hint="Link ou @usuario">
+            <input className={inputCls} value={form.instagram} onChange={(e) => setF({ instagram: e.target.value })} placeholder="https://instagram.com/cortinasfn" />
           </Field>
           <Field label="E-mail">
             <input className={inputCls} value={form.email} onChange={(e) => setF({ email: e.target.value })} placeholder="contato@fncortinas.com.br" />

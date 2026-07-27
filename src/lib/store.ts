@@ -31,8 +31,8 @@ export const defaultEmpresa: Empresa = {
   nome: "FN Cortinas",
   slogan: "Cortinas e persianas sob medida · Alto padrão",
   telefone: "",
-  whatsapp: "",
-  instagram: "",
+  whatsapp: "https://wa.me/message/GJZAEBZGCSLPH1",
+  instagram: "https://www.instagram.com/cortinasfn/",
   site: "",
   email: "",
   cnpj: "",
@@ -126,6 +126,18 @@ function migrateProposal(p: any): Proposal {
   };
 }
 
+/** Mescla empresa: mantém o valor salvo quando preenchido, senão usa o padrão. */
+function mergeEmpresa(base: Empresa, saved?: Partial<Empresa>): Empresa {
+  const out = { ...base };
+  if (saved) {
+    (Object.keys(base) as (keyof Empresa)[]).forEach((k) => {
+      const v = saved[k];
+      if (typeof v === "string" && v.trim() !== "") out[k] = v;
+    });
+  }
+  return out;
+}
+
 let hydrated = false;
 /** Carrega o estado salvo no navegador. Chamado uma vez no client (pós-hydration). */
 function hydrate() {
@@ -149,7 +161,8 @@ function hydrate() {
       cores: saved.cores ?? base.cores,
       // mescla vars para não perder chaves novas em versões futuras
       vars: { ...base.vars, ...saved.vars },
-      empresa: { ...base.empresa, ...saved.empresa },
+      // empresa: usa o valor salvo se preenchido; senão, cai no padrão (pré-preenchidos)
+      empresa: mergeEmpresa(base.empresa, saved.empresa),
     };
     emit();
   } catch {

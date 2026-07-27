@@ -7,7 +7,7 @@ import { PageHeader, Card, GoldButton, Modal, Field, NumberInput, selectCls, inp
 import { useStore, store, useCalcCtx } from "@/lib/store";
 import { calcularProposta, calcularOrcamento, formatBRL, type Tecido, type ComercialInput, type PropostaResult, type OpcaoResult } from "@/lib/pricing-engine";
 import type { ComodoData } from "@/lib/mockData";
-import { gerarQRWhatsApp } from "@/lib/qr";
+import { gerarQRWhatsApp, whatsappUrl } from "@/lib/qr";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/proposta")({
@@ -26,6 +26,19 @@ function addDaysISO(iso: string, days: number) {
 
 const nome = (cat: Tecido[], cod?: number | null, fallback = "—") =>
   cod == null ? fallback : cat.find((t) => t.codigo === cod)?.nome ?? fallback;
+
+/** Instagram: exibe @handle a partir de um link ou de um @usuario. */
+function instaHandle(v: string) {
+  if (!v) return "";
+  const m = v.match(/instagram\.com\/([^/?#]+)/i);
+  const h = (m ? m[1] : v).replace(/^@/, "").replace(/\/$/, "");
+  return h ? "@" + h : "";
+}
+function instaUrl(v: string) {
+  if (!v) return "";
+  if (/^https?:\/\//i.test(v)) return v;
+  return "https://instagram.com/" + v.replace(/^@/, "");
+}
 
 function Proposta() {
   const { id } = Route.useSearch();
@@ -667,7 +680,11 @@ function DocumentoPreviewOpcoes({ proposal, resultado, empresa, validadeISO, tec
           <div className="min-w-0">
             <div className="text-gold text-[14px] font-semibold tracking-wide uppercase truncate">{empresa.nome || "FN Cortinas"}</div>
             <div className="text-[10px] text-[oklch(0.85_0.03_90)] leading-relaxed mt-0.5">
-              {[empresa.telefone, empresa.instagram].filter(Boolean).join(" · ")}
+              <div className="flex flex-wrap items-center gap-x-2">
+                {empresa.telefone && <span>{empresa.telefone}</span>}
+                {whatsappUrl(empresa.whatsapp) && <a href={whatsappUrl(empresa.whatsapp)} target="_blank" rel="noreferrer" className="text-gold underline">WhatsApp</a>}
+                {empresa.instagram && <a href={instaUrl(empresa.instagram)} target="_blank" rel="noreferrer" className="text-gold underline">{instaHandle(empresa.instagram)}</a>}
+              </div>
               {empresa.endereco && <div>{empresa.endereco}</div>}
               {empresa.cnpj && <div>CNPJ {empresa.cnpj}</div>}
             </div>
@@ -762,13 +779,19 @@ async function gerarPDFOpcoes({ proposal, resultado, comercial, empresa, validad
   const tx = M + (logo ? 68 : 0);
   doc.setTextColor(...gold); doc.setFont("helvetica", "bold"); doc.setFontSize(15);
   doc.text((empresa.nome || "FN Cortinas").toUpperCase(), tx, 46);
-  doc.setTextColor(224, 220, 208); doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
   let hy = 62;
-  [
-    [empresa.telefone, empresa.instagram].filter(Boolean).join("   ·   "),
-    empresa.endereco,
-    empresa.cnpj ? "CNPJ " + empresa.cnpj : "",
-  ].filter(Boolean).forEach((l: string) => { doc.text(l, tx, hy); hy += 12; });
+  // Linha 1: telefone + WhatsApp (link) + Instagram (link)
+  let cx = tx;
+  const lightC: [number, number, number] = [224, 220, 208];
+  if (empresa.telefone) { doc.setTextColor(...lightC); doc.text(empresa.telefone, cx, hy); cx += doc.getTextWidth(empresa.telefone) + 14; }
+  const wUrl = whatsappUrl(empresa.whatsapp);
+  if (wUrl) { doc.setTextColor(...gold); doc.textWithLink("WhatsApp", cx, hy, { url: wUrl }); cx += doc.getTextWidth("WhatsApp") + 14; }
+  if (empresa.instagram) { const ig = instaHandle(empresa.instagram); doc.setTextColor(...gold); doc.textWithLink(ig, cx, hy, { url: instaUrl(empresa.instagram) }); }
+  hy += 13;
+  doc.setTextColor(...lightC);
+  if (empresa.endereco) { doc.text(empresa.endereco, tx, hy); hy += 12; }
+  if (empresa.cnpj) { doc.text("CNPJ " + empresa.cnpj, tx, hy); hy += 12; }
 
   doc.setTextColor(...gold); doc.setFont("helvetica", "bold"); doc.setFontSize(13);
   doc.text("Nº " + (proposal.numero ?? ""), w - M, 42, { align: "right" });
