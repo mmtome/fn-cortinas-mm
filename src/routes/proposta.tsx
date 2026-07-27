@@ -5,8 +5,9 @@ import jsPDF from "jspdf";
 
 import { PageHeader, Card, GoldButton, Modal, Field, NumberInput, selectCls, inputCls, formatDate } from "@/components/ui-kit";
 import { useStore, store, useCalcCtx } from "@/lib/store";
-import { calcularProposta, formatBRL, type Tecido, type ComercialInput, type PropostaResult } from "@/lib/pricing-engine";
+import { calcularProposta, calcularOrcamento, formatBRL, type Tecido, type ComercialInput, type PropostaResult, type OpcaoResult } from "@/lib/pricing-engine";
 import type { ComodoData } from "@/lib/mockData";
+import { gerarQRWhatsApp } from "@/lib/qr";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/proposta")({
@@ -42,12 +43,23 @@ function Proposta() {
   useEffect(() => { setComercial(proposal?.comercial); }, [proposal?.id]);
 
   const comodos = proposal?.comodos ?? [];
+  const isOpcoes = !!(proposal?.opcoes && proposal.opcoes.length);
   const res: PropostaResult | undefined = useMemo(
     () => (proposal && comodos.length ? calcularProposta(comodos, comercial ?? proposal.comercial, ctx) : undefined),
     [proposal, comodos, comercial, ctx]
   );
+  const resultado: OpcaoResult[] = useMemo(
+    () => (proposal && isOpcoes ? calcularOrcamento(proposal.ambientes ?? [], proposal.opcoes ?? [], comercial ?? proposal.comercial, ctx) : []),
+    [proposal, isOpcoes, comercial, ctx]
+  );
 
   const validadeISO = proposal ? addDaysISO(proposal.data, 15) : "";
+
+  const salvarAjustesOpcoes = () => {
+    if (!proposal || !comercial) return;
+    store.upsertProposal({ ...proposal, comercial, valor: resultado[0]?.aVistaTotal ?? proposal.valor });
+    toast.success("Ajustes salvos na proposta");
+  };
 
   const setC = (patch: Partial<ComercialInput>) =>
     setComercial((c) => ({ ...(c ?? proposal!.comercial), ...patch }));
@@ -115,7 +127,13 @@ function Proposta() {
           </div>
         </div>
 
-        {proposal && res && comercial ? (
+        {proposal && isOpcoes && comercial ? (
+          <PropostaOpcoes
+            proposal={proposal} resultado={resultado} comercial={comercial} setC={setC}
+            onSalvar={salvarAjustesOpcoes} empresa={empresa} validadeISO={validadeISO}
+            tecidos={tecidos} forros={forros} blackouts={blackouts}
+          />
+        ) : proposal && res && comercial ? (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <BreakdownEmpresa res={res} comodos={comodos} tecidos={tecidos} />
@@ -569,4 +587,276 @@ function gerarPDF({ proposal, comodos, res, comercial, empresa, validadeISO, tec
   }
 
   doc.save(`Proposta-${proposal.cliente.replace(/\s+/g, "-")}.pdf`);
+}
+
+// =========================================================
+// NOVO FORMATO — orçamento por opções (tabela por opção)
+// =========================================================
+function descreverOpcao(e: any, tecidos: Tecido[], forros: Tecido[], blackouts: Tecido[]) {
+  const parts = [e.modelo, nome(tecidos, e.tecidoCodigo) + (e.cor ? ` ${e.cor}` : "")];
+  if (e.forroCodigo != null) parts.push("Forro " + nome(forros, e.forroCodigo) + (e.costuraXForro ? " (costurado)" : ""));
+  if (e.blackoutCodigo != null) parts.push(nome(blackouts, e.blackoutCodigo));
+  if (e.motorizada) parts.push("Motorizada");
+  return parts.filter(Boolean).join(" · ");
+}
+
+async function loadDataURL(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url);
+    const blob = await r.blob();
+    return await new Promise((resolve) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result as string);
+      fr.onerror = () => resolve(null);
+      fr.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
+function PropostaOpcoes({ proposal, resultado, comercial, setC, onSalvar, empresa, validadeISO, tecidos, forros, blackouts }: any) {
+  const [gerando, setGerando] = useState(false);
+  const [qr, setQr] = useState<string | null>(null);
+  useEffect(() => { gerarQRWhatsApp(empresa.whatsapp).then(setQr); }, [empresa.whatsapp]);
+
+  const gerar = async () => {
+    setGerando(true);
+    try {
+      await gerarPDFOpcoes({ proposal, resultado, comercial, empresa, validadeISO, tecidos, forros, blackouts, qr });
+      toast.success("PDF gerado");
+    } catch { toast.error("Não foi possível gerar o PDF"); }
+    setGerando(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="surface rounded-2xl p-5 sm:p-6 flex flex-wrap items-end gap-5 justify-between">
+        <div className="flex gap-6 flex-wrap">
+          <div className="w-48">
+            <Field label={`Desconto · ${comercial.desconto}%`}>
+              <input type="range" min={0} max={20} step={1} className="w-full accent-[var(--gold)]" value={comercial.desconto} onChange={(e) => setC({ desconto: +e.target.value })} />
+            </Field>
+          </div>
+          <div className="w-28">
+            <Field label="Parcelas">
+              <NumberInput value={comercial.parcelas} onChange={(n: number) => setC({ parcelas: n })} min={2} max={12} integer />
+            </Field>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <GoldButton variant="outline" onClick={onSalvar}><Save className="w-3.5 h-3.5" /> Salvar ajustes</GoldButton>
+          <GoldButton onClick={gerar}><Download className="w-3.5 h-3.5" /> {gerando ? "Gerando…" : "Gerar PDF"}</GoldButton>
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground mb-3">Pré-visualização do PDF</div>
+        <DocumentoPreviewOpcoes proposal={proposal} resultado={resultado} empresa={empresa} validadeISO={validadeISO} tecidos={tecidos} forros={forros} blackouts={blackouts} qr={qr} />
+      </div>
+    </div>
+  );
+}
+
+function DocumentoPreviewOpcoes({ proposal, resultado, empresa, validadeISO, tecidos, forros, blackouts, qr }: any) {
+  const parcelas = resultado[0]?.parcelas ?? proposal.comercial?.parcelas ?? 10;
+  return (
+    <div className="rounded-2xl overflow-hidden border border-white/[0.05] max-w-3xl bg-white text-[var(--navy-deep)]">
+      {/* Cabeçalho navy */}
+      <div className="bg-[var(--navy-deep)] px-6 sm:px-8 py-6 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <img src="/logo-fn.png" alt="" className="w-12 h-12 object-contain shrink-0" />
+          <div className="min-w-0">
+            <div className="text-gold text-[14px] font-semibold tracking-wide uppercase truncate">{empresa.nome || "FN Cortinas"}</div>
+            <div className="text-[10px] text-[oklch(0.85_0.03_90)] leading-relaxed mt-0.5">
+              {[empresa.telefone, empresa.instagram].filter(Boolean).join(" · ")}
+              {empresa.endereco && <div>{empresa.endereco}</div>}
+              {empresa.cnpj && <div>CNPJ {empresa.cnpj}</div>}
+            </div>
+          </div>
+        </div>
+        <div className="text-right shrink-0 flex flex-col items-end gap-2">
+          <div className="text-gold text-[13px] font-semibold">Nº {proposal.numero ?? "—"}</div>
+          {qr && <img src={qr} alt="WhatsApp" className="w-14 h-14 rounded bg-white p-0.5" />}
+        </div>
+      </div>
+
+      {/* Corpo */}
+      <div className="px-6 sm:px-8 py-6">
+        <div className="text-[9px] uppercase tracking-[0.2em] text-[var(--navy-deep)]/50">Orçamento</div>
+        <div className="text-[18px] font-semibold mt-1">{proposal.cliente}</div>
+        <div className="text-[11px] text-[var(--navy-deep)]/60 mt-1">
+          Data {formatDate(proposal.data)} · Validade {formatDate(validadeISO)}
+          {proposal.endereco ? ` · ${proposal.endereco}` : ""}
+        </div>
+
+        <div className="mt-6 space-y-7">
+          {resultado.map((op: OpcaoResult, i: number) => (
+            <div key={i}>
+              <div className="text-[13px] font-semibold">{op.nome}</div>
+              <div className="w-8 h-[2px] bg-[var(--gold)] my-1.5" />
+              <div className="text-[10px] text-[var(--navy-deep)]/55 mb-2">{descreverOpcao(op.estrutura, tecidos, forros, blackouts)}</div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px] border-collapse">
+                  <thead>
+                    <tr className="text-[9px] uppercase tracking-wide text-[var(--navy-deep)]/50 bg-[var(--navy-deep)]/[0.04]">
+                      <th className="text-left font-medium py-1.5 px-2">Ambiente</th>
+                      <th className="text-center font-medium py-1.5 px-1">Qtd</th>
+                      <th className="text-right font-medium py-1.5 px-1">Larg</th>
+                      <th className="text-right font-medium py-1.5 px-1">Alt</th>
+                      <th className="text-right font-medium py-1.5 px-2">À vista</th>
+                      <th className="text-right font-medium py-1.5 px-2">{parcelas}x</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {op.linhas.map((l, j) => (
+                      <tr key={j} className="border-b border-[var(--navy-deep)]/[0.06]">
+                        <td className="py-1.5 px-2">{l.ambiente}</td>
+                        <td className="text-center px-1">{l.quant}</td>
+                        <td className="text-right px-1">{l.medidas.larguraParede.toFixed(2)}</td>
+                        <td className="text-right px-1">{l.medidas.alturaParede.toFixed(2)}</td>
+                        <td className="text-right px-2 stat">{formatBRL(l.aVista)}</td>
+                        <td className="text-right px-2 stat text-[var(--navy-deep)]/60">{formatBRL(l.parcelado)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-2 rounded-lg bg-[var(--navy-deep)] text-white px-4 py-2.5 flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-wide text-gold">Total</span>
+                <span className="text-[12px]">
+                  <span className="stat font-semibold">{formatBRL(op.aVistaTotal)}</span> à vista
+                  <span className="text-white/50"> · {parcelas}x de {formatBRL(op.parceladoTotal / parcelas)}</span>
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-7 text-[10px] text-[var(--navy-deep)]/55 space-y-0.5">
+          <div>Pagamento: 50% de entrada + 50% na entrega. Parcelado sem juros no cartão.</div>
+          <div>Prazo: 7 a 15 dias úteis após o fechamento · Garantia 12 meses.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function gerarPDFOpcoes({ proposal, resultado, comercial, empresa, validadeISO, tecidos, forros, blackouts, qr }: any) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const w = doc.internal.pageSize.getWidth();
+  const h = doc.internal.pageSize.getHeight();
+  const M = 40;
+  const navy: [number, number, number] = [20, 26, 48];
+  const gold: [number, number, number] = [201, 168, 76];
+  const ink: [number, number, number] = [38, 40, 52];
+  const soft: [number, number, number] = [120, 116, 104];
+  const line: [number, number, number] = [228, 224, 216];
+  const head: [number, number, number] = [241, 239, 233];
+
+  const logo = await loadDataURL("/logo-fn.png");
+  const parcelas = resultado[0]?.parcelas ?? comercial.parcelas ?? 10;
+
+  // ---- Cabeçalho navy ----
+  const HB = 116;
+  doc.setFillColor(...navy); doc.rect(0, 0, w, HB, "F");
+  if (logo) doc.addImage(logo, "PNG", M, 28, 56, 56);
+  const tx = M + (logo ? 68 : 0);
+  doc.setTextColor(...gold); doc.setFont("helvetica", "bold"); doc.setFontSize(15);
+  doc.text((empresa.nome || "FN Cortinas").toUpperCase(), tx, 46);
+  doc.setTextColor(224, 220, 208); doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+  let hy = 62;
+  [
+    [empresa.telefone, empresa.instagram].filter(Boolean).join("   ·   "),
+    empresa.endereco,
+    empresa.cnpj ? "CNPJ " + empresa.cnpj : "",
+  ].filter(Boolean).forEach((l: string) => { doc.text(l, tx, hy); hy += 12; });
+
+  doc.setTextColor(...gold); doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+  doc.text("Nº " + (proposal.numero ?? ""), w - M, 42, { align: "right" });
+  if (qr) {
+    const qs = 58;
+    doc.setFillColor(255, 255, 255); doc.roundedRect(w - M - qs, 50, qs, qs, 4, 4, "F");
+    doc.addImage(qr, "PNG", w - M - qs + 5, 55, qs - 10, qs - 10);
+  }
+
+  // ---- Corpo ----
+  let y = HB + 30;
+  doc.setTextColor(...soft); doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+  doc.text("ORÇAMENTO", M, y);
+  doc.setTextColor(...ink); doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+  doc.text(proposal.cliente, M, y + 18);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...soft);
+  doc.text(`Data ${formatDate(proposal.data)}   ·   Validade ${formatDate(validadeISO)}`, M, y + 34);
+  if (proposal.endereco) { doc.text(proposal.endereco, M, y + 47); y += 13; }
+  y += 62;
+
+  // Colunas
+  const xQ = 250, xL = 300, xA = 356, xV = 470, xP = w - M;
+  const ensure = (need: number) => { if (y + need > h - M - 24) { doc.addPage(); y = M + 14; } };
+
+  resultado.forEach((op: OpcaoResult) => {
+    ensure(96);
+    doc.setTextColor(...ink); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+    doc.text(op.nome, M, y);
+    doc.setDrawColor(...gold); doc.setLineWidth(1); doc.line(M, y + 5, M + 40, y + 5);
+    y += 16;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...soft);
+    doc.text(descreverOpcao(op.estrutura, tecidos, forros, blackouts), M, y);
+    y += 12;
+
+    doc.setFillColor(...head); doc.rect(M - 6, y - 9, w - 2 * M + 12, 18, "F");
+    doc.setTextColor(...soft); doc.setFont("helvetica", "bold"); doc.setFontSize(7.5);
+    doc.text("AMBIENTE", M, y + 3.5);
+    doc.text("QTD", xQ, y + 3.5);
+    doc.text("LARG", xL, y + 3.5);
+    doc.text("ALT", xA, y + 3.5);
+    doc.text("À VISTA", xV, y + 3.5, { align: "right" });
+    doc.text(`${parcelas}X`, xP, y + 3.5, { align: "right" });
+    y += 20;
+
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    op.linhas.forEach((l) => {
+      ensure(22);
+      doc.setTextColor(...ink);
+      doc.text(String(l.ambiente).slice(0, 34), M, y);
+      doc.text(String(l.quant), xQ, y);
+      doc.text(l.medidas.larguraParede.toFixed(2), xL, y);
+      doc.text(l.medidas.alturaParede.toFixed(2), xA, y);
+      doc.text(formatBRL(l.aVista), xV, y, { align: "right" });
+      doc.setTextColor(...soft);
+      doc.text(formatBRL(l.parcelado), xP, y, { align: "right" });
+      y += 8;
+      doc.setDrawColor(...line); doc.setLineWidth(0.4); doc.line(M - 6, y, w - M + 6, y);
+      y += 12;
+    });
+
+    ensure(34);
+    doc.setFillColor(...navy); doc.roundedRect(M - 6, y - 4, w - 2 * M + 12, 26, 3, 3, "F");
+    doc.setTextColor(...gold); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+    doc.text("TOTAL", M, y + 12);
+    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
+    doc.text(`${formatBRL(op.aVistaTotal)} à vista   ·   ${parcelas}x de ${formatBRL(op.parceladoTotal / parcelas)}`, xP, y + 12, { align: "right" });
+    y += 44;
+  });
+
+  // Condições
+  ensure(70);
+  doc.setTextColor(...soft); doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+  doc.text("CONDIÇÕES", M, y); y += 14;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(90, 90, 100);
+  [
+    "Pagamento: 50% de entrada + 50% na entrega. Parcelado sem juros no cartão.",
+    "Prazo: 7 a 15 dias úteis após o fechamento do pedido.",
+    "Garantia: 12 meses. Instalação inclusa conforme combinado.",
+    `Validade do orçamento: ${formatDate(validadeISO)}.`,
+  ].forEach((c) => { doc.text(`·  ${c}`, M, y); y += 13; });
+
+  // Rodapé
+  doc.setTextColor(...navy); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+  doc.text(empresa.nome || "FN Cortinas", w / 2, h - M + 2, { align: "center" });
+  if (empresa.cnpj) {
+    doc.setFont("helvetica", "normal"); doc.setTextColor(...soft); doc.setFontSize(8);
+    doc.text(`CNPJ ${empresa.cnpj}`, w / 2, h - M + 14, { align: "center" });
+  }
+
+  doc.save(`Orcamento-${String(proposal.cliente).replace(/\s+/g, "-")}.pdf`);
 }

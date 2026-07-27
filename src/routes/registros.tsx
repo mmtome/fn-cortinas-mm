@@ -181,20 +181,41 @@ function ClienteCard({ proposal, onClose }: { proposal: Proposal | null; onClose
         })}
       </div>
 
-      {/* Cômodos */}
-      <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-2">Cômodos · {p.comodos.length}</div>
-      <div className="space-y-1.5 mb-5">
-        {p.comodos.map((c, i) => (
-          <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/[0.02]">
-            <div className="flex items-center gap-2 min-w-0">
-              <Home className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <span className="text-[12px] truncate">{c.ambiente}</span>
-            </div>
-            <span className="text-[12px] stat shrink-0">{formatBRL(c.result.totalFinal)}</span>
+      {/* Detalhamento */}
+      {p.opcoes && p.opcoes.length ? (
+        <>
+          <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-2">
+            {p.ambientes?.length ?? 0} {(p.ambientes?.length ?? 0) === 1 ? "ambiente" : "ambientes"} · {p.opcoes.length} {p.opcoes.length === 1 ? "opção" : "opções"}
           </div>
-        ))}
-        {p.comodos.length === 0 && <div className="text-[12px] text-muted-foreground">Sem detalhamento.</div>}
-      </div>
+          <div className="space-y-1.5 mb-5">
+            {p.ambientes?.map((a, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/[0.02]">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Home className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-[12px] truncate">{a.ambiente}{a.quant > 1 ? ` ×${a.quant}` : ""}</span>
+                </div>
+                <span className="text-[11px] text-muted-foreground shrink-0">{a.medidas.larguraParede} × {a.medidas.alturaParede} m</span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-2">Cômodos · {p.comodos.length}</div>
+          <div className="space-y-1.5 mb-5">
+            {p.comodos.map((c, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/[0.02]">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Home className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-[12px] truncate">{c.ambiente}</span>
+                </div>
+                <span className="text-[12px] stat shrink-0">{formatBRL(c.result.totalFinal)}</span>
+              </div>
+            ))}
+            {p.comodos.length === 0 && <div className="text-[12px] text-muted-foreground">Sem detalhamento.</div>}
+          </div>
+        </>
+      )}
 
       <div className="flex items-baseline justify-between border-t border-white/[0.05] pt-4">
         <span className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Total</span>

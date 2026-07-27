@@ -518,6 +518,87 @@ export function calcularProposta(comodos: ComodoInput[], comercial: ComercialInp
   return { comodos: results, subtotalProducao, totalComLucro, descontoValor, totalFinal, totalPagamento, valorParcela };
 }
 
+// ============================================================
+// ORÇAMENTO POR OPÇÕES
+// Ambientes (medidas) são cadastrados uma vez; cada opção é uma
+// configuração de materiais aplicada a todos os ambientes.
+// ============================================================
+export interface AmbienteItem {
+  ambiente: string;
+  observacoes?: string;
+  quant: number;              // quantidade de cortinas iguais nesse ambiente
+  medidas: MedidasInput;
+  instalacao: InstalacaoInput;
+}
+
+export interface OpcaoItem {
+  nome: string;               // ex: "Só cortina", "+ Blackout 80%"
+  estrutura: EstruturaInput;  // materiais dessa opção
+}
+
+export interface LinhaOpcao {
+  ambiente: string;
+  quant: number;
+  medidas: MedidasInput;
+  result: CalcResult;
+  aVista: number;             // totalFinal × quant
+  parcelado: number;          // aVista ÷ (1 − taxa das parcelas)
+}
+
+export interface OpcaoResult {
+  nome: string;
+  estrutura: EstruturaInput;
+  linhas: LinhaOpcao[];
+  aVistaTotal: number;
+  parceladoTotal: number;
+  parcelas: number;
+}
+
+export function defaultAmbiente(): AmbienteItem {
+  const base = defaultPricingInput();
+  return { ambiente: "Sala de Estar", observacoes: "", quant: 1, medidas: base.medidas, instalacao: base.instalacao };
+}
+
+export function defaultOpcao(nome = "Só cortina"): OpcaoItem {
+  return { nome, estrutura: defaultPricingInput().estrutura };
+}
+
+/**
+ * Cada opção (materiais) é aplicada a todos os ambientes. Para cada ambiente
+ * calcula o valor à vista (base) e o parcelado (à vista ÷ (1 − taxa)).
+ */
+export function calcularOrcamento(
+  ambientes: AmbienteItem[],
+  opcoes: OpcaoItem[],
+  comercial: ComercialInput,
+  ctx: CalcCtx = {}
+): OpcaoResult[] {
+  const v: Vars = { ...DEFAULT_VARS, ...ctx.vars };
+  const parcelas = Math.min(12, Math.max(2, comercial.parcelas || 10));
+  const taxa = taxaMaquininha("Cartão Crédito Parcelado", parcelas, v);
+  const grossUp = (x: number) => +(taxa > 0 ? x / (1 - taxa) : x).toFixed(2);
+
+  return opcoes.map((op) => {
+    const linhas: LinhaOpcao[] = ambientes.map((amb) => {
+      const quant = amb.quant || 1;
+      const result = calcular(
+        {
+          ambiente: { cliente: "", ambiente: amb.ambiente, observacoes: amb.observacoes },
+          medidas: amb.medidas,
+          estrutura: op.estrutura,
+          instalacao: amb.instalacao,
+          comercial: { ...comercial, forma: "Dinheiro", parcelas: 1 }, // à vista base
+        },
+        ctx
+      );
+      const aVista = +(result.totalFinal * quant).toFixed(2);
+      return { ambiente: amb.ambiente, quant, medidas: amb.medidas, result, aVista, parcelado: grossUp(aVista) };
+    });
+    const aVistaTotal = +linhas.reduce((s, l) => s + l.aVista, 0).toFixed(2);
+    return { nome: op.nome, estrutura: op.estrutura, linhas, aVistaTotal, parceladoTotal: grossUp(aVistaTotal), parcelas };
+  });
+}
+
 /** Rótulo curto de exibição para a lista de cômodos. */
 export function ambienteLabel(comodos: { ambiente: string }[]): string {
   if (comodos.length === 0) return "—";

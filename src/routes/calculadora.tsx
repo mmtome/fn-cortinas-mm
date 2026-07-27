@@ -1,19 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Save, AlertTriangle, Minus, Plus, Trash2, Home, Wallet } from "lucide-react";
+import { Save, AlertTriangle, Minus, Plus, Trash2, Home, Wallet, Layers } from "lucide-react";
 
 import { PageHeader, GoldButton, Field, Switch, NumberInput, inputCls, selectCls } from "@/components/ui-kit";
 import {
-  calcularProposta,
-  defaultComodo,
+  calcularOrcamento,
+  defaultAmbiente,
+  defaultOpcao,
   defaultPricingInput,
-  ambienteLabel,
   formatBRL,
-  type ComodoInput,
+  type AmbienteItem,
+  type OpcaoItem,
+  type EstruturaInput,
   type ComercialInput,
 } from "@/lib/pricing-engine";
 import { useStore, store, useCalcCtx } from "@/lib/store";
-import { metrosDisponiveis } from "@/lib/mockData";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/calculadora")({ component: Calculadora });
@@ -27,71 +28,70 @@ const FORMAS = ["Pix", "Cartão Débito", "Cartão Crédito 1x", "Cartão Crédi
 
 function Calculadora() {
   const navigate = useNavigate();
-  const stock = useStore((s) => s.stock);
   const tecidos = useStore((s) => s.tecidos);
   const forros = useStore((s) => s.forros);
   const blackouts = useStore((s) => s.blackouts);
   const modelos = useStore((s) => s.modelos);
   const cores = useStore((s) => s.cores);
+  const proposals = useStore((s) => s.proposals);
   const ctx = useCalcCtx();
 
   const [cliente, setCliente] = useState("");
   const [endereco, setEndereco] = useState("");
   const [contato, setContato] = useState("");
-  const [comodos, setComodos] = useState<ComodoInput[]>([defaultComodo()]);
-  const [comercial, setComercial] = useState<ComercialInput>(defaultPricingInput().comercial);
+  const [ambientes, setAmbientes] = useState<AmbienteItem[]>([defaultAmbiente()]);
+  const [opcoes, setOpcoes] = useState<OpcaoItem[]>([{ ...defaultOpcao("Só cortina"), estrutura: { ...defaultPricingInput().estrutura, forroCodigo: null, blackoutCodigo: null } }]);
+  const [comercial, setComercial] = useState<ComercialInput>({ ...defaultPricingInput().comercial, parcelas: 10 });
   const [active, setActive] = useState(0);
 
-  const result = useMemo(() => calcularProposta(comodos, comercial, ctx), [comodos, comercial, ctx]);
-  const comodo = comodos[active];
-  const cr = result.comodos[active];
+  const resultado = useMemo(() => calcularOrcamento(ambientes, opcoes, comercial, ctx), [ambientes, opcoes, comercial, ctx]);
+  const amb = ambientes[active];
 
-  const estoqueTecido = metrosDisponiveis(stock, comodo.estrutura.tecidoCodigo);
-  const estoqueForro = metrosDisponiveis(stock, comodo.estrutura.forroCodigo ?? undefined);
-  const alertaTecido = estoqueTecido !== null && estoqueTecido < cr.mtsTecido;
-  const alertaForro = estoqueForro !== null && comodo.estrutura.forroCodigo != null && estoqueForro < cr.mtsForro;
+  // ---- Ambientes ----
+  const setAmbiente = (patch: Partial<AmbienteItem>) => setAmbientes((as) => as.map((a, i) => (i === active ? { ...a, ...patch } : a)));
+  const setMedidas = (patch: Partial<AmbienteItem["medidas"]>) => setAmbiente({ medidas: { ...amb.medidas, ...patch } });
+  const setInstalacao = (patch: Partial<AmbienteItem["instalacao"]>) => setAmbiente({ instalacao: { ...amb.instalacao, ...patch } });
+  const addAmbiente = () => { setAmbientes((as) => [...as, defaultAmbiente()]); setActive(ambientes.length); };
+  const removeAmbiente = (i: number) => {
+    if (ambientes.length <= 1) return;
+    setAmbientes((as) => as.filter((_, idx) => idx !== i));
+    setActive((a) => Math.max(0, Math.min(a > i ? a - 1 : a, ambientes.length - 2)));
+  };
 
-  const setComodo = (patch: Partial<ComodoInput>) =>
-    setComodos((cs) => cs.map((c, i) => (i === active ? { ...c, ...patch } : c)));
-  const setMedidas = (patch: Partial<ComodoInput["medidas"]>) => setComodo({ medidas: { ...comodo.medidas, ...patch } });
-  const setEstrutura = (patch: Partial<ComodoInput["estrutura"]>) => setComodo({ estrutura: { ...comodo.estrutura, ...patch } });
-  const setInstalacao = (patch: Partial<ComodoInput["instalacao"]>) => setComodo({ instalacao: { ...comodo.instalacao, ...patch } });
+  // ---- Opções ----
+  const setOpcao = (i: number, patch: Partial<EstruturaInput>) =>
+    setOpcoes((os) => os.map((o, idx) => (idx === i ? { ...o, estrutura: { ...o.estrutura, ...patch } } : o)));
+  const setOpcaoNome = (i: number, nome: string) => setOpcoes((os) => os.map((o, idx) => (idx === i ? { ...o, nome } : o)));
+  const removeOpcao = (i: number) => setOpcoes((os) => (os.length <= 1 ? os : os.filter((_, idx) => idx !== i)));
+
+  const forroPadrao = forros[0]?.codigo ?? null;
+  const bk = (re: RegExp) => blackouts.find((b) => re.test(b.nome))?.codigo ?? null;
+  const base = () => ({ ...defaultPricingInput().estrutura, forroCodigo: null, blackoutCodigo: null });
+  const PRESETS: { nome: string; estrutura: Partial<EstruturaInput> }[] = [
+    { nome: "Só cortina", estrutura: {} },
+    { nome: "+ Forro", estrutura: { forroCodigo: forroPadrao, costuraXForro: true } },
+    { nome: "+ Blackout 80%", estrutura: { blackoutCodigo: bk(/80/) } },
+    { nome: "+ Blackout 100%", estrutura: { blackoutCodigo: bk(/100/) ?? bk(/black/i) } },
+  ];
+  const addOpcao = (preset?: { nome: string; estrutura: Partial<EstruturaInput> }) =>
+    setOpcoes((os) => [...os, { nome: preset?.nome ?? `Opção ${os.length + 1}`, estrutura: { ...base(), ...(preset?.estrutura ?? {}) } }]);
+
   const setC = (patch: Partial<ComercialInput>) => setComercial((c) => ({ ...c, ...patch }));
 
-  const addComodo = () => {
-    setComodos((cs) => [...cs, defaultComodo()]);
-    setActive(comodos.length);
-    toast.success("Cômodo adicionado");
-  };
-  const removeComodo = (i: number) => {
-    if (comodos.length <= 1) return;
-    setComodos((cs) => cs.filter((_, idx) => idx !== i));
-    setActive((a) => {
-      let na = i < a ? a - 1 : a;
-      const nextLen = comodos.length - 1;
-      if (na > nextLen - 1) na = nextLen - 1;
-      return Math.max(0, na);
-    });
-  };
-
   const salvar = () => {
-    if (!cliente.trim()) {
-      toast.error("Informe o nome do cliente");
-      return;
-    }
-    const comodosData = comodos.map((c, i) => ({ ...c, result: result.comodos[i] }));
-    const id = "p" + Math.random().toString(36).slice(2, 9);
+    if (!cliente.trim()) { toast.error("Informe o nome do cliente"); return; }
+    const numero = Math.max(1000, ...proposals.map((p) => p.numero ?? 0)) + 1;
+    const label = ambientes.map((a) => a.ambiente).filter(Boolean).slice(0, 2).join(", ") + (ambientes.length > 2 ? ` +${ambientes.length - 2}` : "");
     store.upsertProposal({
-      id,
-      cliente,
-      endereco,
-      contato,
-      comodos: comodosData,
-      comercial,
-      valor: result.totalFinal,
+      id: "p" + Math.random().toString(36).slice(2, 9),
+      numero,
+      cliente, endereco, contato,
+      comodos: [],
+      ambientes, opcoes, comercial,
+      valor: resultado[0]?.aVistaTotal ?? 0,
       status: "Pendente",
       data: new Date().toISOString().slice(0, 10),
-      ambiente: ambienteLabel(comodos),
+      ambiente: label || "Orçamento",
     });
     toast.success("Proposta salva");
     navigate({ to: "/registros" });
@@ -99,20 +99,7 @@ function Calculadora() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Atendimento"
-        title="Nova precificação"
-        subtitle="Um ou vários cômodos no mesmo orçamento. O preço é calculado em tempo real."
-      />
-
-      {/* Total fixo no mobile */}
-      <div className="xl:hidden sticky top-[57px] z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 mb-5 bg-[var(--background)]/90 backdrop-blur-md border-y border-white/[0.05] flex items-center justify-between">
-        <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Total · {comodos.length} {comodos.length > 1 ? "cômodos" : "cômodo"}</div>
-        <div className="flex items-baseline gap-2">
-          <span key={result.totalFinal} className="text-[18px] font-medium stat animate-value">{formatBRL(result.totalFinal)}</span>
-          {comercial.parcelas > 1 && <span className="text-[11px] text-muted-foreground">{comercial.parcelas}× {formatBRL(result.valorParcela)}</span>}
-        </div>
-      </div>
+      <PageHeader eyebrow="Atendimento" title="Nova precificação" subtitle="Cadastre os ambientes uma vez e compare várias opções (cortina, forro, blackout). O preço sai por opção." />
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-8">
         <div className="space-y-5">
@@ -133,169 +120,105 @@ function Calculadora() {
             </div>
           </div>
 
-          {/* Barra de cômodos */}
+          {/* Ambientes */}
           <div>
-            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2.5">Cômodos</div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2.5">Ambientes</div>
             <div className="flex gap-2 flex-wrap">
-              {comodos.map((c, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActive(i)}
-                  className={`group inline-flex items-center gap-2 pl-3 pr-2 py-2 rounded-lg border text-[12px] transition-colors ${
-                    i === active
-                      ? "border-[oklch(0.80_0.10_88_/_0.4)] bg-[oklch(0.80_0.10_88_/_0.06)] text-foreground"
-                      : "border-white/[0.06] text-muted-foreground hover:text-foreground hover:bg-white/[0.03]"
-                  }`}
-                >
+              {ambientes.map((a, i) => (
+                <button key={i} onClick={() => setActive(i)}
+                  className={`group inline-flex items-center gap-2 pl-3 pr-2 py-2 rounded-lg border text-[12px] transition-colors ${i === active ? "border-[oklch(0.80_0.10_88_/_0.4)] bg-[oklch(0.80_0.10_88_/_0.06)] text-foreground" : "border-white/[0.06] text-muted-foreground hover:text-foreground hover:bg-white/[0.03]"}`}>
                   <Home className={`w-3.5 h-3.5 ${i === active ? "text-gold" : ""}`} />
-                  <span className="max-w-[140px] truncate">{c.ambiente || `Cômodo ${i + 1}`}</span>
-                  <span className="text-[11px] text-muted-foreground stat">{formatBRL(result.comodos[i].totalFinal)}</span>
-                  {comodos.length > 1 && (
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => { e.stopPropagation(); removeComodo(i); }}
-                      className="ml-1 p-0.5 rounded text-muted-foreground hover:text-[oklch(0.72_0.16_25)]"
-                      aria-label="Remover cômodo"
-                    >
+                  <span className="max-w-[140px] truncate">{a.ambiente || `Ambiente ${i + 1}`}</span>
+                  {ambientes.length > 1 && (
+                    <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); removeAmbiente(i); }} className="ml-1 p-0.5 rounded text-muted-foreground hover:text-[oklch(0.72_0.16_25)]" aria-label="Remover ambiente">
                       <Trash2 className="w-3 h-3" />
                     </span>
                   )}
                 </button>
               ))}
-              <button
-                onClick={addComodo}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-white/[0.12] text-[12px] text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" /> Adicionar cômodo
+              <button onClick={addAmbiente} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-white/[0.12] text-[12px] text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors">
+                <Plus className="w-3.5 h-3.5" /> Adicionar ambiente
               </button>
             </div>
           </div>
 
-          {/* Editor do cômodo ativo */}
+          {/* Editor do ambiente ativo */}
           <div className="surface rounded-2xl p-5 sm:p-7 space-y-8">
-            {/* Ambiente */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <AmbienteField value={comodo.ambiente} onChange={(v) => setComodo({ ambiente: v })} />
-              <Field label="Observações (opcional)">
-                <input className={inputCls} value={comodo.observacoes ?? ""} onChange={(e) => setComodo({ observacoes: e.target.value })} placeholder="Detalhes, preferências..." />
-              </Field>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="md:col-span-2">
+                <AmbienteField value={amb.ambiente} onChange={(v) => setAmbiente({ ambiente: v })} />
+              </div>
+              <NumField label="Quantidade" v={amb.quant} set={(v) => setAmbiente({ quant: Math.max(1, Math.round(v)) })} />
             </div>
 
-            {/* Medidas */}
             <Section title="Medidas — meça apenas a parede">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                   <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                    <NumField label="Largura parede" v={comodo.medidas.larguraParede} set={(v) => setMedidas({ larguraParede: v })} suf="m" />
-                    <NumField label="Altura parede" v={comodo.medidas.alturaParede} set={(v) => setMedidas({ alturaParede: v })} suf="m" />
+                    <NumField label="Largura parede" v={amb.medidas.larguraParede} set={(v) => setMedidas({ larguraParede: v })} suf="m" />
+                    <NumField label="Altura parede" v={amb.medidas.alturaParede} set={(v) => setMedidas({ alturaParede: v })} suf="m" />
                   </div>
-
-                  <div className="mt-5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-                    <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-3">Medidas da cortina</div>
-                    <div className="grid grid-cols-2 gap-2 text-center">
-                      <MiniInfo label="Largura" value={`${comodo.medidas.larguraParede.toFixed(2)} m`} />
-                      <MiniInfo label="Altura" value={`${comodo.medidas.alturaParede.toFixed(2)} m`} />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Corte do tecido</span>
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full ${cr.caso === "B" ? "text-gold bg-[oklch(0.80_0.10_88_/_0.08)]" : "text-[oklch(0.78_0.10_150)] bg-[oklch(0.55_0.12_150_/_0.10)]"}`}>
-                        {cr.caso === "B" ? "Virar o rolo" : "Rolo em pé"}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 mt-3 text-center">
-                      <MiniInfo label="Altura de corte" value={`${cr.alturaCorte.toFixed(2)} m`} />
-                      <MiniInfo label="Tecido" value={`${cr.mtsTecido.toFixed(2)} m`} />
-                      <MiniInfo label={cr.caso === "B" ? "Panos" : "Larg. franzida"} value={cr.caso === "B" ? `${cr.nPanos}` : `${cr.larguraFranzida.toFixed(2)} m`} />
-                    </div>
-                  </div>
-
-                  {comodo.medidas.alturaParede > 4.5 && (
+                  {amb.medidas.alturaParede > 4.5 && (
                     <div className="mt-4 flex items-center gap-2 text-[12px] text-gold">
                       <AlertTriangle className="w-3.5 h-3.5" /> Altura acima de 4,5m — andaime incluído.
                     </div>
                   )}
-                </div>
-                <div className="surface-flat rounded-xl p-6 flex items-center justify-center min-h-[200px]">
-                  <PreviewParede larguraParede={comodo.medidas.larguraParede} alturaParede={comodo.medidas.alturaParede} larguraCortina={comodo.medidas.larguraParede} />
-                </div>
-              </div>
-            </Section>
-
-            {/* Estrutura */}
-            <Section title="Estrutura, tecidos e acabamentos">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <Field label="Modelo">
-                  <select className={selectCls} value={comodo.estrutura.modelo} onChange={(e) => setEstrutura({ modelo: e.target.value })}>
-                    {modelos.map((m) => <option key={m.nome}>{m.nome}</option>)}
-                    {!modelos.some((m) => m.nome === comodo.estrutura.modelo) && (
-                      <option value={comodo.estrutura.modelo}>{comodo.estrutura.modelo}</option>
-                    )}
-                  </select>
-                </Field>
-                <Field label="Motorizada" hint="Acionamento elétrico">
-                  <div className="h-[42px] flex items-center">
-                    <Switch checked={comodo.estrutura.motorizada} onChange={(v) => setEstrutura({ motorizada: v })} label={comodo.estrutura.motorizada ? "Sim" : "Não"} />
+                  <div className="mt-4">
+                    <Field label="Observações (opcional)">
+                      <input className={inputCls} value={amb.observacoes ?? ""} onChange={(e) => setAmbiente({ observacoes: e.target.value })} placeholder="Detalhes, preferências..." />
+                    </Field>
                   </div>
-                </Field>
-                <Field label="Tecido principal" hint={alertaTecido ? `Estoque insuficiente · ${estoqueTecido}m` : estoqueTecido != null ? `${estoqueTecido}m em estoque` : undefined}>
-                  <select className={`${selectCls} ${alertaTecido ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={comodo.estrutura.tecidoCodigo} onChange={(e) => setEstrutura({ tecidoCodigo: +e.target.value })}>
-                    {tecidos.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
-                  </select>
-                </Field>
-                <Field label="Cor do tecido">
-                  <select className={selectCls} value={comodo.estrutura.cor ?? ""} onChange={(e) => setEstrutura({ cor: e.target.value || undefined })}>
-                    <option value="">— selecione —</option>
-                    {cores.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </Field>
-                <Field label="Forro" hint={comodo.estrutura.forroCodigo == null ? "Sem forro" : alertaForro ? `Estoque insuficiente · ${estoqueForro}m` : estoqueForro != null ? `${estoqueForro}m em estoque` : undefined}>
-                  <select className={`${selectCls} ${alertaForro ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={comodo.estrutura.forroCodigo ?? "none"} onChange={(e) => setEstrutura({ forroCodigo: e.target.value === "none" ? null : +e.target.value })}>
-                    <option value="none">Sem forro</option>
-                    {forros.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
-                  </select>
-                </Field>
-                <Field label="Blackout" hint={comodo.estrutura.blackoutCodigo == null ? "Sem blackout" : "Trilho duplo inferido"}>
-                  <select className={selectCls} value={comodo.estrutura.blackoutCodigo ?? "none"} onChange={(e) => setEstrutura({ blackoutCodigo: e.target.value === "none" ? null : +e.target.value })}>
-                    <option value="none">Sem blackout</option>
-                    {blackouts.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
-                  </select>
-                </Field>
-                {comodo.estrutura.forroCodigo != null && (
-                  <Field label="Forro costurado junto" hint="Quando ativo, trilho permanece simples">
-                    <div className="h-[42px] flex items-center">
-                      <Switch checked={comodo.estrutura.costuraXForro} onChange={(v) => setEstrutura({ costuraXForro: v })} label={comodo.estrutura.costuraXForro ? "Sim" : "Não"} />
-                    </div>
-                  </Field>
-                )}
+                </div>
+                <div className="surface-flat rounded-xl p-6 flex items-center justify-center min-h-[180px]">
+                  <PreviewParede larguraParede={amb.medidas.larguraParede} alturaParede={amb.medidas.alturaParede} />
+                </div>
               </div>
             </Section>
 
-            {/* Instalação */}
             <Section title="Instalação">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <Field label="Instalar no local" hint="Inclui colocação">
                   <div className="h-[42px] flex items-center">
-                    <Switch checked={comodo.instalacao.instalar} onChange={(v) => setInstalacao({ instalar: v })} label={comodo.instalacao.instalar ? "Sim" : "Não"} />
+                    <Switch checked={amb.instalacao.instalar} onChange={(v) => setInstalacao({ instalar: v })} label={amb.instalacao.instalar ? "Sim" : "Não"} />
                   </div>
                 </Field>
                 <Field label="Dificuldade">
-                  <select className={selectCls} value={comodo.instalacao.dificuldade} onChange={(e) => setInstalacao({ dificuldade: e.target.value as any })} disabled={!comodo.instalacao.instalar}>
+                  <select className={selectCls} value={amb.instalacao.dificuldade} onChange={(e) => setInstalacao({ dificuldade: e.target.value as any })} disabled={!amb.instalacao.instalar}>
                     <option>Padrão</option>
                     <option>Difícil</option>
                   </select>
                 </Field>
-                <NumField label="Deslocamento" v={comodo.instalacao.deslocamento} set={(v) => setInstalacao({ deslocamento: v })} suf="R$" />
+                <NumField label="Deslocamento" v={amb.instalacao.deslocamento} set={(v) => setInstalacao({ deslocamento: v })} suf="R$" />
               </div>
             </Section>
+          </div>
 
-            {/* Valor do cômodo */}
-            <div className="flex items-center justify-between pt-2 border-t border-white/[0.05]">
-              <span className="text-[12px] text-muted-foreground">Valor deste cômodo</span>
-              <span className="text-[16px] font-medium stat text-gold">{formatBRL(cr.totalFinal)}</span>
+          {/* Opções */}
+          <div className="surface rounded-2xl p-5 sm:p-7 space-y-5">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-gold" />
+              <div className="text-[13px] font-medium">Opções para comparar</div>
+              <span className="text-[11px] text-muted-foreground">· {opcoes.length}</span>
+            </div>
+            <div className="text-[12px] text-muted-foreground -mt-2">Cada opção é uma configuração de materiais aplicada a todos os ambientes. No PDF, cada opção vira uma tabela.</div>
+
+            <div className="space-y-4">
+              {opcoes.map((o, i) => (
+                <OpcaoCard
+                  key={i} idx={i} opcao={o} total={resultado[i]}
+                  tecidos={tecidos} forros={forros} blackouts={blackouts} modelos={modelos} cores={cores}
+                  onNome={(n: string) => setOpcaoNome(i, n)} onSet={(p: Partial<EstruturaInput>) => setOpcao(i, p)}
+                  onRemove={opcoes.length > 1 ? () => removeOpcao(i) : undefined}
+                />
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              {PRESETS.map((p) => (
+                <button key={p.nome} onClick={() => addOpcao(p)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-white/[0.12] text-[12px] text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors">
+                  <Plus className="w-3.5 h-3.5" /> {p.nome}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -311,22 +234,14 @@ function Calculadora() {
                   {FORMAS.map((f) => <option key={f}>{f}</option>)}
                 </select>
               </Field>
-              <Field label="Parcelas">
-                <NumberInput value={comercial.parcelas} onChange={(n) => setC({ parcelas: n })} min={1} max={18} integer />
+              <Field label="Parcelas (mostradas no orçamento)">
+                <NumberInput value={comercial.parcelas} onChange={(n) => setC({ parcelas: n })} min={2} max={12} integer />
               </Field>
               <div className="md:col-span-2">
-                <Field label={`Desconto · ${comercial.desconto}%`} hint="Aplicado sobre o total da proposta">
+                <Field label={`Desconto · ${comercial.desconto}%`} hint="Aplicado sobre o total de cada opção">
                   <input type="range" min={0} max={20} step={1} className="w-full accent-[var(--gold)]" value={comercial.desconto} onChange={(e) => setC({ desconto: +e.target.value })} />
                 </Field>
               </div>
-            </div>
-
-            <div className="mt-6 rounded-2xl border border-[oklch(0.80_0.10_88_/_0.25)] bg-[oklch(0.80_0.10_88_/_0.04)] p-5 sm:p-6 flex items-end justify-between gap-4">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Total da proposta</div>
-                <div className="text-[11px] text-muted-foreground mt-1">{comodos.length} {comodos.length > 1 ? "cômodos" : "cômodo"}{comercial.parcelas > 1 ? ` · ${comercial.parcelas}× de ${formatBRL(result.valorParcela)}` : ""}</div>
-              </div>
-              <div key={result.totalFinal} className="text-[30px] sm:text-[34px] font-medium tracking-tight stat animate-value">{formatBRL(result.totalFinal)}</div>
             </div>
 
             <div className="flex justify-end gap-2 mt-6">
@@ -337,61 +252,91 @@ function Calculadora() {
           </div>
         </div>
 
-        <ResumoProposta cliente={cliente} comodos={comodos} result={result} comercial={comercial} alerta={alertaTecido || alertaForro} active={active} onPick={setActive} />
+        {/* Resumo lateral: totais por opção */}
+        <div className="hidden xl:block xl:sticky xl:top-6 self-start space-y-3">
+          <div className="surface rounded-2xl p-6">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Resumo</div>
+            <div className="text-[14px] mt-2 font-medium">{cliente || "Novo cliente"}</div>
+            <div className="text-[11px] text-muted-foreground">{ambientes.length} {ambientes.length > 1 ? "ambientes" : "ambiente"} · {opcoes.length} {opcoes.length > 1 ? "opções" : "opção"}</div>
+            <div className="hairline my-5" />
+            <div className="space-y-3">
+              {resultado.map((op, i) => (
+                <div key={i}>
+                  <div className="flex justify-between items-baseline gap-2">
+                    <span className="text-[12px] text-foreground truncate">{op.nome}</span>
+                    <span className="stat text-[14px] text-gold shrink-0">{formatBRL(op.aVistaTotal)}</span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground text-right">à vista · {op.parcelas}x de {formatBRL(op.parceladoTotal / op.parcelas)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </>
   );
 }
 
 // =========================================================
-// Resumo lateral (proposta inteira)
+// Card de uma opção
 // =========================================================
-function ResumoProposta({ cliente, comodos, result, comercial, alerta, active, onPick }: any) {
+function OpcaoCard({ idx, opcao, total, tecidos, forros, blackouts, modelos, cores, onNome, onSet, onRemove }: any) {
+  const e: EstruturaInput = opcao.estrutura;
   return (
-    <div className="hidden xl:block xl:sticky xl:top-6 self-start space-y-3">
-      <div className="surface rounded-2xl p-6">
-        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Resumo</div>
-        <div className="text-[14px] mt-2 font-medium">{cliente || "Novo cliente"}</div>
-        <div className="text-[11px] text-muted-foreground">{comodos.length} {comodos.length > 1 ? "cômodos" : "cômodo"}</div>
-
-        <div className="hairline my-5" />
-
-        <div className="space-y-1.5">
-          {comodos.map((c: ComodoInput, i: number) => (
-            <button key={i} onClick={() => onPick(i)} className={`w-full flex justify-between gap-3 text-[12px] py-1.5 px-2 -mx-2 rounded-md transition-colors ${i === active ? "bg-white/[0.04]" : "hover:bg-white/[0.02]"}`}>
-              <span className={`truncate ${i === active ? "text-foreground" : "text-muted-foreground"}`}>{c.ambiente || `Cômodo ${i + 1}`}</span>
-              <span className="stat text-foreground shrink-0">{formatBRL(result.comodos[i].totalFinal)}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="hairline my-5" />
-
-        {comercial.desconto > 0 && (
-          <div className="flex justify-between text-[12px] py-1 text-muted-foreground">
-            <span>Desconto · {comercial.desconto}%</span>
-            <span className="stat">− {formatBRL(result.descontoValor)}</span>
-          </div>
-        )}
-        <div className="flex items-baseline justify-between mt-1">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Total</div>
-          <div key={result.totalFinal} className="text-[20px] font-medium tracking-tight stat animate-value">{formatBRL(result.totalFinal)}</div>
-        </div>
-        {comercial.parcelas > 1 && (
-          <div className="text-[11px] text-muted-foreground mt-1 text-right">
-            {comercial.parcelas}× de <span className="stat text-gold">{formatBRL(result.valorParcela)}</span>
-          </div>
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-5">
+      <div className="flex items-center gap-3 mb-4">
+        <span className="w-6 h-6 rounded-md bg-[oklch(0.80_0.10_88_/_0.12)] text-gold text-[11px] font-medium flex items-center justify-center shrink-0">{idx + 1}</span>
+        <input className={`${inputCls} py-1.5`} value={opcao.nome} onChange={(ev) => onNome(ev.target.value)} placeholder="Nome da opção" />
+        {total && <span className="stat text-[14px] text-gold shrink-0">{formatBRL(total.aVistaTotal)}</span>}
+        {onRemove && (
+          <button onClick={onRemove} aria-label="Remover opção" className="p-1.5 rounded-md text-muted-foreground hover:text-[oklch(0.72_0.16_25)] shrink-0">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         )}
       </div>
-
-      {alerta && (
-        <div className="rounded-2xl border border-[oklch(0.72_0.14_25_/_0.25)] bg-[oklch(0.5_0.16_25_/_0.05)] p-4 flex gap-3">
-          <AlertTriangle className="w-4 h-4 text-[oklch(0.78_0.14_25)] shrink-0 mt-0.5" />
-          <div className="text-[12px] text-[oklch(0.85_0.06_25)] leading-relaxed">
-            Estoque insuficiente no cômodo selecionado. Verifique antes de fechar.
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Modelo">
+          <select className={selectCls} value={e.modelo} onChange={(ev) => onSet({ modelo: ev.target.value })}>
+            {modelos.map((m: any) => <option key={m.nome}>{m.nome}</option>)}
+            {!modelos.some((m: any) => m.nome === e.modelo) && <option value={e.modelo}>{e.modelo}</option>}
+          </select>
+        </Field>
+        <Field label="Motorizada">
+          <div className="h-[42px] flex items-center">
+            <Switch checked={e.motorizada} onChange={(v) => onSet({ motorizada: v })} label={e.motorizada ? "Sim" : "Não"} />
           </div>
-        </div>
-      )}
+        </Field>
+        <Field label="Tecido">
+          <select className={selectCls} value={e.tecidoCodigo} onChange={(ev) => onSet({ tecidoCodigo: +ev.target.value })}>
+            {tecidos.map((t: any) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
+          </select>
+        </Field>
+        <Field label="Cor do tecido">
+          <select className={selectCls} value={e.cor ?? ""} onChange={(ev) => onSet({ cor: ev.target.value || undefined })}>
+            <option value="">— selecione —</option>
+            {cores.map((c: string) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </Field>
+        <Field label="Forro">
+          <select className={selectCls} value={e.forroCodigo ?? "none"} onChange={(ev) => onSet({ forroCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
+            <option value="none">Sem forro</option>
+            {forros.map((t: any) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
+          </select>
+        </Field>
+        <Field label="Blackout">
+          <select className={selectCls} value={e.blackoutCodigo ?? "none"} onChange={(ev) => onSet({ blackoutCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
+            <option value="none">Sem blackout</option>
+            {blackouts.map((t: any) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
+          </select>
+        </Field>
+        {e.forroCodigo != null && (
+          <Field label="Forro costurado junto" hint="Trilho permanece simples">
+            <div className="h-[42px] flex items-center">
+              <Switch checked={e.costuraXForro} onChange={(v) => onSet({ costuraXForro: v })} label={e.costuraXForro ? "Sim" : "Não"} />
+            </div>
+          </Field>
+        )}
+      </div>
     </div>
   );
 }
@@ -412,14 +357,7 @@ function AmbienteField({ value, onChange }: { value: string; onChange: (v: strin
           </button>
         </div>
       ) : (
-        <select
-          className={selectCls}
-          value={isPreset ? value : "__other"}
-          onChange={(e) => {
-            if (e.target.value === "__other") { setOtherMode(true); onChange(""); }
-            else onChange(e.target.value);
-          }}
-        >
+        <select className={selectCls} value={isPreset ? value : "__other"} onChange={(e) => { if (e.target.value === "__other") { setOtherMode(true); onChange(""); } else onChange(e.target.value); }}>
           {AMBIENTES.map((a) => <option key={a} value={a}>{a}</option>)}
           <option value="__other">Outro (personalizado)…</option>
         </select>
@@ -437,34 +375,21 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function MiniInfo({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-[var(--background)] py-2.5 px-1">
-      <div className="text-[14px] font-medium stat">{value}</div>
-      <div className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">{label}</div>
-    </div>
-  );
-}
-
-function PreviewParede({ larguraParede, alturaParede, larguraCortina }: { larguraParede: number; alturaParede: number; larguraCortina: number }) {
-  const scaleW = 240 / Math.max(larguraParede, larguraCortina, 0.1);
-  const scaleH = 170 / Math.max(alturaParede, 0.1);
-  const scale = Math.min(scaleW, scaleH);
+function PreviewParede({ larguraParede, alturaParede }: { larguraParede: number; alturaParede: number }) {
+  const scale = Math.min(240 / Math.max(larguraParede, 0.1), 170 / Math.max(alturaParede, 0.1));
   const pW = larguraParede * scale;
   const pH = alturaParede * scale;
-  const cW = Math.min(larguraCortina, larguraParede) * scale;
   return (
     <svg width={pW + 60} height={pH + 60} className="overflow-visible max-w-full">
-      <rect x={30} y={30} width={pW} height={pH} fill="none" stroke="oklch(1 0 0 / 0.10)" strokeWidth={1} />
-      <rect x={30 + (pW - cW) / 2} y={30} width={cW} height={pH} fill="oklch(0.80 0.10 88 / 0.06)" stroke="oklch(0.80 0.10 88 / 0.5)" strokeWidth={1.2} />
-      <text x={30 + pW / 2} y={20} fontSize={9} fill="oklch(0.62 0.012 260)" textAnchor="middle">parede {larguraParede}m</text>
-      <text x={30 + pW / 2} y={30 + pH + 18} fontSize={9} fill="var(--gold)" textAnchor="middle">cortina {larguraCortina} × {alturaParede}m</text>
+      <rect x={30} y={30} width={pW} height={pH} fill="oklch(0.80 0.10 88 / 0.06)" stroke="oklch(0.80 0.10 88 / 0.5)" strokeWidth={1.2} />
+      <text x={30 + pW / 2} y={20} fontSize={9} fill="oklch(0.62 0.012 260)" textAnchor="middle">parede</text>
+      <text x={30 + pW / 2} y={30 + pH + 18} fontSize={9} fill="var(--gold)" textAnchor="middle">{larguraParede} × {alturaParede}m</text>
     </svg>
   );
 }
 
 function NumField({ label, v, set, suf }: { label: string; v: number; set: (n: number) => void; suf?: string }) {
-  const step = suf === "m" ? 0.1 : 10;
+  const step = suf === "m" ? 0.1 : suf === "R$" ? 10 : 1;
   const dec = (n: number) => Math.round(n * 100) / 100;
   return (
     <Field label={label}>

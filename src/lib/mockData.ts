@@ -7,6 +7,8 @@ import {
   type ComodoInput,
   type ComercialInput,
   type CalcResult,
+  type AmbienteItem,
+  type OpcaoItem,
 } from "./pricing-engine";
 
 export type ProposalStatus = "Pendente" | "Aprovado" | "Perdido";
@@ -18,10 +20,13 @@ export interface ComodoData extends ComodoInput {
 
 export interface Proposal {
   id: string;
+  numero?: number;            // nº sequencial do orçamento (novo formato)
   cliente: string;
   endereco: string;           // endereço do cliente
   contato: string;            // telefone/contato do cliente
-  comodos: ComodoData[];      // 1 ou mais cômodos no mesmo orçamento
+  comodos: ComodoData[];      // formato antigo (1 config por cômodo)
+  ambientes?: AmbienteItem[]; // novo formato: ambientes (medidas)
+  opcoes?: OpcaoItem[];       // novo formato: opções de materiais comparadas
   comercial: ComercialInput;  // condições da proposta inteira
   valor: number;              // total final agregado
   status: ProposalStatus;

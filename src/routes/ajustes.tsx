@@ -72,8 +72,11 @@ function EmpresaTab() {
           <Field label="Slogan">
             <input className={inputCls} value={form.slogan} onChange={(e) => setF({ slogan: e.target.value })} placeholder="Cortinas sob medida · Alto padrão" />
           </Field>
-          <Field label="Telefone / WhatsApp">
+          <Field label="Telefone">
             <input className={inputCls} value={form.telefone} onChange={(e) => setF({ telefone: e.target.value })} placeholder="(11) 99999-9999" />
+          </Field>
+          <Field label="WhatsApp (p/ QR Code)" hint="Só números, com DDD. Ex: 5534999999999">
+            <input className={inputCls} value={form.whatsapp} onChange={(e) => setF({ whatsapp: e.target.value })} placeholder="5534999999999" />
           </Field>
           <Field label="Instagram">
             <input className={inputCls} value={form.instagram} onChange={(e) => setF({ instagram: e.target.value })} placeholder="@fncortinas" />
@@ -84,6 +87,14 @@ function EmpresaTab() {
           <Field label="Site">
             <input className={inputCls} value={form.site} onChange={(e) => setF({ site: e.target.value })} placeholder="www.fncortinas.com.br" />
           </Field>
+          <Field label="CNPJ">
+            <input className={inputCls} value={form.cnpj} onChange={(e) => setF({ cnpj: e.target.value })} placeholder="00.000.000/0001-00" />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Endereço">
+              <input className={inputCls} value={form.endereco} onChange={(e) => setF({ endereco: e.target.value })} placeholder="Rua, número — bairro, cidade/UF" />
+            </Field>
+          </div>
         </div>
         <div className="flex justify-end mt-6">
           <GoldButton onClick={salvar}>Salvar dados</GoldButton>

@@ -19,18 +19,24 @@ export interface Empresa {
   nome: string;
   slogan: string;
   telefone: string;
+  whatsapp: string;   // número p/ QR Code (só dígitos, com DDD/DDI)
   instagram: string;
   site: string;
   email: string;
+  cnpj: string;
+  endereco: string;
 }
 
 export const defaultEmpresa: Empresa = {
   nome: "FN Cortinas",
   slogan: "Cortinas e persianas sob medida · Alto padrão",
   telefone: "",
+  whatsapp: "",
   instagram: "",
   site: "",
   email: "",
+  cnpj: "",
+  endereco: "",
 };
 
 // -------------------- Estado --------------------
