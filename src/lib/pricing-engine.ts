@@ -52,22 +52,24 @@ export const DEFAULT_VARS = {
   larguraUtilRolo: 2.85,   // largura útil — limite entre Caso A e Caso B
   bainhaLimite: 0.15,      // dobra mínima usável — usada só para decidir A/B
   bainha: 0.35,            // bainha cheia (cima + baixo) — usada na metragem do Caso B
-  forroSeparadoFator: 1.2, // forro não costurado junto: largura × 1,2
+  forroSeparadoFator: 1.5, // forro separado (microfibra/outro): largura × 1,5
+  blackoutFator: 1.2,      // blackout: largura × 1,2
 
   // Multiplicadores por metro de cortina pronta
   fatorTecido: 3,          // franzido (caimento) = 3× a largura
   fatorEntretela: 3,       // entretela acompanha a largura franzida
   fatorCordao: 1,
   rodiziosPorMetro: 22,
+  rodiziosSegundaPorMetro: 11, // 2ª cortina (blackout/forro separado) — densidade menor
   fatorTrilho: 1,          // trilho = largura da parede
 
   // Preços unitários dos acessórios (R$)
   rodizio: 0.22,
   cordaoWavePorMetro: 5,
-  entretelaPorMetro: 3,
-  trilhoSimplesPorMetro: 21, // perfil 13 + suporte 8
-  trilhoDuploPorMetro: 38,   // perfil 25 + suporte 13
-  varaoSuicoPorMetro: 21,
+  entretelaPorMetro: 1,       // FN: R$1/m sobre a largura franzida
+  trilhoSimplesPorMetro: 13,  // FN: 1 tecido ou forro costurado junto
+  trilhoDuploPorMetro: 25,    // FN: com blackout ou forro separado
+  varaoSuicoPorMetro: 13,
 };
 
 export type Vars = typeof DEFAULT_VARS;
@@ -380,13 +382,13 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
 
   // --- Forro ---
   // Costurado junto (trilho simples): acompanha o tecido.
-  // Separado (trilho duplo): largura × 1,2.
+  // Separado (trilho duplo): largura × 1,5 (microfibra/outro).
   const mtsForro = temForro
     ? estrutura.costuraXForro ? mtsTecido : +(L * v.forroSeparadoFator).toFixed(2)
     : 0;
 
   // Blackout — sempre uma camada separada (trilho duplo): largura × 1,2.
-  const mtsBlackout = temBlackout ? +(L * v.forroSeparadoFator).toFixed(2) : 0;
+  const mtsBlackout = temBlackout ? +(L * v.blackoutFator).toFixed(2) : 0;
 
   // Entretela acompanha a largura franzida (zero se o próprio tecido é blackout).
   const mtsEntretela = tecido && tecido.blackout ? 0 : larguraFranzida;
@@ -397,8 +399,11 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
   const usaCordao = modeloAtual ? modeloAtual.usaCordao : estrutura.modelo === "Wave";
   const mtsCordao = usaCordao ? +(L * v.fatorCordao).toFixed(2) : 0;
 
-  // Presilhas/rodízios: qtd por metro × largura.
-  const qtdRodizios = Math.ceil(L * v.rodiziosPorMetro);
+  // Presilhas/rodízios: qtd por metro × largura. No trilho duplo há uma 2ª
+  // cortina (blackout ou forro separado) no 2º trilho → soma os rodízios dela.
+  const temSegundaCamada = temBlackout || (temForro && !estrutura.costuraXForro);
+  const qtdRodiziosSegunda = temSegundaCamada ? Math.ceil(L * v.rodiziosSegundaPorMetro) : 0;
+  const qtdRodizios = Math.ceil(L * v.rodiziosPorMetro) + qtdRodiziosSegunda;
 
   const trilhoInferido = inferirTrilho({
     temBlackout, temForro,

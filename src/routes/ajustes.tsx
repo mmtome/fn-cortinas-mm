@@ -362,6 +362,7 @@ const GROUPS: { title: string; fields: VarField[] }[] = [
       { key: "bainhaLimite", label: "Dobra mínima (Caso A)", suf: "m", step: 0.05 },
       { key: "bainha", label: "Bainha cheia (cima+baixo)", suf: "m", step: 0.05 },
       { key: "forroSeparadoFator", label: "Forro separado (×)", step: 0.1 },
+      { key: "blackoutFator", label: "Blackout (×)", step: 0.1 },
     ],
   },
   {
@@ -371,6 +372,7 @@ const GROUPS: { title: string; fields: VarField[] }[] = [
       { key: "fatorEntretela", label: "Entretela (×)", step: 0.1 },
       { key: "fatorCordao", label: "Cordão Wave (×)", step: 0.1 },
       { key: "rodiziosPorMetro", label: "Rodízios / m", step: 1 },
+      { key: "rodiziosSegundaPorMetro", label: "Rodízios 2ª camada / m", step: 1 },
       { key: "fatorTrilho", label: "Trilho (×)", step: 0.1 },
     ],
   },
