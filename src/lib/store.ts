@@ -6,6 +6,7 @@ import {
   CATALOGO_FORROS,
   CATALOGO_BLACKOUTS,
   CATALOGO_MODELOS,
+  CATALOGO_CORES,
   DEFAULT_VARS,
   type Tecido,
   type ModeloItem,
@@ -40,6 +41,7 @@ type State = {
   forros: Tecido[];
   blackouts: Tecido[];
   modelos: ModeloItem[];
+  cores: string[];
   vars: Vars;
   empresa: Empresa;
 };
@@ -56,6 +58,7 @@ function defaultState(): State {
     forros: CATALOGO_FORROS,
     blackouts: CATALOGO_BLACKOUTS,
     modelos: CATALOGO_MODELOS.map((m) => ({ ...m })),
+    cores: [...CATALOGO_CORES],
     vars: { ...DEFAULT_VARS },
     empresa: { ...defaultEmpresa },
   };
@@ -137,6 +140,7 @@ function hydrate() {
       forros: saved.forros ?? base.forros,
       blackouts: saved.blackouts ?? base.blackouts,
       modelos: saved.modelos ?? base.modelos,
+      cores: saved.cores ?? base.cores,
       // mescla vars para não perder chaves novas em versões futuras
       vars: { ...base.vars, ...saved.vars },
       empresa: { ...base.empresa, ...saved.empresa },
@@ -276,6 +280,16 @@ export const store = {
   },
   removeModelo: (index: number) => {
     commit({ ...state, modelos: state.modelos.filter((_, i) => i !== index) });
+  },
+
+  // ---- Cores (lista global, vale para todos os tecidos) ----
+  addCor: (nome: string) => {
+    const cor = nome.trim();
+    if (!cor || state.cores.some((c) => c.toLowerCase() === cor.toLowerCase())) return;
+    commit({ ...state, cores: [...state.cores, cor] });
+  },
+  removeCor: (nome: string) => {
+    commit({ ...state, cores: state.cores.filter((c) => c !== nome) });
   },
 
   // ---- Variáveis ----

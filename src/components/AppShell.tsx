@@ -33,9 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="w-60 shrink-0 hidden md:flex flex-col border-r border-white/[0.05] bg-[var(--sidebar)] sticky top-0 h-screen">
         <div className="px-6 py-7">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-md bg-[var(--gold)] flex items-center justify-center">
-              <span className="text-[13px] font-semibold text-[var(--navy-deep)]">F</span>
-            </div>
+            <img src="/logo-fn.png" alt="FN Cortinas" className="w-9 h-9 object-contain" />
             <div className="text-[14px] font-medium tracking-tight">FN Cortinas</div>
           </div>
         </div>
@@ -75,9 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* ===== Header mobile ===== */}
         <header className="md:hidden sticky top-0 z-30 border-b border-white/[0.05] bg-[var(--background)]/90 backdrop-blur-md px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded bg-[var(--gold)] flex items-center justify-center">
-              <span className="text-[11px] font-semibold text-[var(--navy-deep)]">F</span>
-            </div>
+            <img src="/logo-fn.png" alt="FN Cortinas" className="w-7 h-7 object-contain" />
             <span className="text-[13px] font-medium">FN Cortinas</span>
           </div>
           <Link

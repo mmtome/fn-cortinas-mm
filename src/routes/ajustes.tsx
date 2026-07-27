@@ -126,6 +126,37 @@ function MateriaisTab() {
   return (
     <div className="space-y-6">
       {KINDS.map((k) => <MaterialList key={k.key} kind={k.key} label={k.label} blackout={k.blackout} />)}
+      <CoresCard />
+    </div>
+  );
+}
+
+function CoresCard() {
+  const cores = useStore((s) => s.cores);
+  const [nova, setNova] = useState("");
+  const add = () => {
+    const n = nova.trim();
+    if (!n) return;
+    if (cores.some((c) => c.toLowerCase() === n.toLowerCase())) { toast.error("Cor já cadastrada"); return; }
+    store.addCor(n); setNova(""); toast.success("Cor adicionada");
+  };
+  return (
+    <div className="surface rounded-2xl p-5 sm:p-6">
+      <div className="text-[13px] font-medium mb-1">Cores <span className="text-muted-foreground">· {cores.length}</span></div>
+      <div className="text-[12px] text-muted-foreground mb-4">Lista única — vale para todos os tecidos. Aparece na seleção da calculadora e no orçamento.</div>
+      <div className="flex flex-wrap gap-2 mb-4">
+        {cores.map((c) => (
+          <span key={c} className="inline-flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] text-[12px]">
+            {c}
+            <button onClick={() => { store.removeCor(c); toast.success("Cor removida"); }} aria-label={`Remover ${c}`} className="text-muted-foreground hover:text-[oklch(0.72_0.16_25)] leading-none text-[15px]">×</button>
+          </span>
+        ))}
+        {cores.length === 0 && <div className="text-[12px] text-muted-foreground">Nenhuma cor cadastrada.</div>}
+      </div>
+      <div className="flex gap-2 max-w-sm">
+        <input className={inputCls} value={nova} onChange={(e) => setNova(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="Ex: Areia" />
+        <GoldButton variant="outline" onClick={add}><Plus className="w-3.5 h-3.5" /> Adicionar</GoldButton>
+      </div>
     </div>
   );
 }
@@ -314,12 +345,27 @@ function ModelosTab() {
 type VarField = { key: keyof Vars; label: string; suf?: string; step?: number; pct?: boolean };
 const GROUPS: { title: string; fields: VarField[] }[] = [
   {
-    title: "Lucro e pagamento",
+    title: "Lucro",
     fields: [
       { key: "lucro", label: "Lucro base", pct: true },
-      { key: "descontoPix", label: "Desconto Pix", pct: true },
-      { key: "jurosCredito1x", label: "Juros crédito 1x", pct: true },
-      { key: "jurosCartaoParcela", label: "Juros por parcela", pct: true },
+    ],
+  },
+  {
+    title: "Taxas do cartão (maquininha) · Pix e dinheiro = 0",
+    fields: [
+      { key: "taxaDebito", label: "Débito", pct: true },
+      { key: "taxaCreditoVista", label: "Crédito à vista", pct: true },
+      { key: "taxaParc2", label: "2x", pct: true },
+      { key: "taxaParc3", label: "3x", pct: true },
+      { key: "taxaParc4", label: "4x", pct: true },
+      { key: "taxaParc5", label: "5x", pct: true },
+      { key: "taxaParc6", label: "6x", pct: true },
+      { key: "taxaParc7", label: "7x", pct: true },
+      { key: "taxaParc8", label: "8x", pct: true },
+      { key: "taxaParc9", label: "9x", pct: true },
+      { key: "taxaParc10", label: "10x", pct: true },
+      { key: "taxaParc11", label: "11x", pct: true },
+      { key: "taxaParc12", label: "12x", pct: true },
     ],
   },
   {

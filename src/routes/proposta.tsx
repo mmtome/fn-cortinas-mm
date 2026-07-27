@@ -364,7 +364,7 @@ function DocumentoPreview({ proposal, comodos, res, comercial, empresa, validade
                 </div>
                 <dl className="grid grid-cols-[110px_1fr] sm:grid-cols-[130px_1fr] gap-y-1.5 gap-x-5 text-[12px]">
                   <Spec k="Modelo" v={c.estrutura.modelo} />
-                  <Spec k="Tecido" v={nome(tecidos, c.estrutura.tecidoCodigo)} />
+                  <Spec k="Tecido" v={nome(tecidos, c.estrutura.tecidoCodigo) + (c.estrutura.cor ? ` · ${c.estrutura.cor}` : "")} />
                   <Spec k="Forro" v={nome(forros, c.estrutura.forroCodigo, "Sem forro")} />
                   {c.estrutura.blackoutCodigo != null && (
                     <Spec k="Blackout" v={nome(blackouts, c.estrutura.blackoutCodigo)} />
@@ -512,7 +512,7 @@ function gerarPDF({ proposal, comodos, res, comercial, empresa, validadeISO, tec
 
     const linhas: [string, string][] = [
       ["Modelo", c.estrutura.modelo],
-      ["Tecido", nome(tecidos, c.estrutura.tecidoCodigo)],
+      ["Tecido", nome(tecidos, c.estrutura.tecidoCodigo) + (c.estrutura.cor ? ` · ${c.estrutura.cor}` : "")],
       ["Forro", nome(forros, c.estrutura.forroCodigo, "Sem forro")],
       ...(c.estrutura.blackoutCodigo != null
         ? ([["Blackout", nome(blackouts, c.estrutura.blackoutCodigo)]] as [string, string][])

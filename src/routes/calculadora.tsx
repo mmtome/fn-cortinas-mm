@@ -32,6 +32,7 @@ function Calculadora() {
   const forros = useStore((s) => s.forros);
   const blackouts = useStore((s) => s.blackouts);
   const modelos = useStore((s) => s.modelos);
+  const cores = useStore((s) => s.cores);
   const ctx = useCalcCtx();
 
   const [cliente, setCliente] = useState("");
@@ -191,13 +192,10 @@ function Calculadora() {
                   </div>
 
                   <div className="mt-5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-                    <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-3">Cortina desejada · calculada</div>
+                    <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-3">Medidas da cortina</div>
                     <div className="grid grid-cols-2 gap-2 text-center">
-                      <MiniInfo label="Largura (arred.)" value={`${cr.larguraCortina} m`} />
+                      <MiniInfo label="Largura" value={`${comodo.medidas.larguraParede.toFixed(2)} m`} />
                       <MiniInfo label="Altura" value={`${comodo.medidas.alturaParede.toFixed(2)} m`} />
-                    </div>
-                    <div className="text-[10px] text-muted-foreground mt-2.5 text-center">
-                      Largura arredondada para o inteiro de cima ({comodo.medidas.larguraParede.toFixed(2)} → {cr.larguraCortina} m).
                     </div>
                   </div>
 
@@ -222,7 +220,7 @@ function Calculadora() {
                   )}
                 </div>
                 <div className="surface-flat rounded-xl p-6 flex items-center justify-center min-h-[200px]">
-                  <PreviewParede larguraParede={comodo.medidas.larguraParede} alturaParede={comodo.medidas.alturaParede} larguraCortina={cr.larguraCortina} />
+                  <PreviewParede larguraParede={comodo.medidas.larguraParede} alturaParede={comodo.medidas.alturaParede} larguraCortina={comodo.medidas.larguraParede} />
                 </div>
               </div>
             </Section>
@@ -246,6 +244,12 @@ function Calculadora() {
                 <Field label="Tecido principal" hint={alertaTecido ? `Estoque insuficiente · ${estoqueTecido}m` : estoqueTecido != null ? `${estoqueTecido}m em estoque` : undefined}>
                   <select className={`${selectCls} ${alertaTecido ? "border-[oklch(0.72_0.14_25_/_0.4)]" : ""}`} value={comodo.estrutura.tecidoCodigo} onChange={(e) => setEstrutura({ tecidoCodigo: +e.target.value })}>
                     {tecidos.map((t) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
+                  </select>
+                </Field>
+                <Field label="Cor do tecido">
+                  <select className={selectCls} value={comodo.estrutura.cor ?? ""} onChange={(e) => setEstrutura({ cor: e.target.value || undefined })}>
+                    <option value="">— selecione —</option>
+                    {cores.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </Field>
                 <Field label="Forro" hint={comodo.estrutura.forroCodigo == null ? "Sem forro" : alertaForro ? `Estoque insuficiente · ${estoqueForro}m` : estoqueForro != null ? `${estoqueForro}m em estoque` : undefined}>

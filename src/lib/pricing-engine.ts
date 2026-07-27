@@ -22,9 +22,23 @@
 // Tudo o que o usuário pode ajustar em "Variáveis do projeto".
 export const DEFAULT_VARS = {
   lucro: 0.30,
-  jurosCartaoParcela: 0.0125,
-  descontoPix: 0.01,
-  jurosCredito1x: 0.033,
+
+  // Taxas da maquininha (repassadas ao cliente no parcelado — "sem juros" pra ele).
+  // Pix e dinheiro = preço-base (taxa 0). Parcelado: preço ÷ (1 − taxa).
+  taxaDebito: 0.0137,
+  taxaCreditoVista: 0.0315, // crédito à vista (1x)
+  taxaParc2: 0.0539,
+  taxaParc3: 0.0612,
+  taxaParc4: 0.0685,
+  taxaParc5: 0.0757,
+  taxaParc6: 0.0828,
+  taxaParc7: 0.0899,
+  taxaParc8: 0.0969,
+  taxaParc9: 0.1038,
+  taxaParc10: 0.1106,
+  taxaParc11: 0.1174,
+  taxaParc12: 0.1240,
+
   andaimeAlturaMin: 4.5,
   andaimeValor: 100,       // adicional quando a altura passa de 4,5m
   motorizadaValor: 100,    // adicional quando a cortina é motorizada
@@ -95,26 +109,29 @@ export interface Tecido {
 }
 
 // Catálogos iniciais (seed). O usuário pode adicionar/editar livremente.
+// Valores conforme a Tabela de Tecidos da empresa.
 export const CATALOGO_TECIDOS: Tecido[] = [
-  { codigo: 1100, nome: "Cetim 3,00M Branco", largura: 3, precoMetro: 23 },
-  { codigo: 1102, nome: "Cetim 3,00M Pérola", largura: 3, precoMetro: 23 },
-  { codigo: 1130, nome: "Voil Bruxelas Areia", largura: 3, precoMetro: 23 },
-  { codigo: 1131, nome: "Voil Bruxelas Taupe", largura: 3, precoMetro: 23 },
-  { codigo: 1132, nome: "Voil Bruxelas Titânio", largura: 3, precoMetro: 23 },
-  { codigo: 1502, nome: "Lisieux Linho Areia", largura: 3, precoMetro: 23 },
-  { codigo: 1820, nome: "Voil Notre Dame Linho", largura: 3, precoMetro: 23 },
-  { codigo: 5001, nome: "Oxford 3,00M Branco", largura: 3, precoMetro: 23 },
+  { codigo: 101, nome: "Linho", largura: 3, precoMetro: 23 },
+  { codigo: 102, nome: "Moorea", largura: 3, precoMetro: 43 },
+  { codigo: 103, nome: "Shantung", largura: 2.8, precoMetro: 49 },
+  { codigo: 104, nome: "Cetim", largura: 3, precoMetro: 18 },
+  { codigo: 105, nome: "Voil", largura: 3, precoMetro: 13 },
 ];
 
 export const CATALOGO_FORROS: Tecido[] = [
-  { codigo: 1300, nome: "Microfibra 100g Bege", largura: 3, precoMetro: 13 },
-  { codigo: 1301, nome: "Microfibra 100g Branco", largura: 3, precoMetro: 23 },
-  { codigo: 1140, nome: "Voil Ligório OffWhite", largura: 3, precoMetro: 23 },
+  { codigo: 201, nome: "Microfibra 65g", largura: 3, precoMetro: 13 },
+  { codigo: 202, nome: "Microfibra 100g", largura: 3, precoMetro: 16 },
 ];
 
 export const CATALOGO_BLACKOUTS: Tecido[] = [
-  { codigo: 4679, nome: "Blackout Superblack Branco", largura: 2.8, precoMetro: 23, blackout: true },
-  { codigo: 4681, nome: "Blackout Superblack Chumbo", largura: 2.8, precoMetro: 23, blackout: true },
+  { codigo: 301, nome: "Blackout 80%", largura: 3, precoMetro: 35, blackout: true },
+  { codigo: 302, nome: "Blackout 100%", largura: 2.8, precoMetro: 45, blackout: true },
+  { codigo: 303, nome: "Blackout Linho 100%", largura: 2.8, precoMetro: 66, blackout: true },
+];
+
+// Cores disponíveis — lista única, vale para todos os tecidos. Editável em Ajustes.
+export const CATALOGO_CORES: string[] = [
+  "Branco", "Off White", "Bege", "Cinza", "Chumbo", "Trigo", "Mesclado", "Cru", "Pérola",
 ];
 
 // -------------------- Entrada --------------------
@@ -136,6 +153,7 @@ export const larguraCortinaDesejada = (larguraParede: number) =>
 export interface EstruturaInput {
   modelo: Modelo;
   tecidoCodigo: number;
+  cor?: string;            // cor do tecido (lista global, não altera o preço)
   forroCodigo: number | null;
   blackoutCodigo: number | null;
   costuraXForro: boolean;  // forro costurado junto
@@ -278,15 +296,30 @@ export function aplicarLucro(subtotal: number, instalacao: number, deslocamento:
   return subtotal * (1 + v.lucro + margemExtra / 100) + instalacao + deslocamento;
 }
 
-export function calcularParcelamento(total: number, forma: FormaPagamento, parcelas: number, v: Vars = DEFAULT_VARS) {
-  let mult = 1;
+// Taxa da maquininha para a forma/nº de parcelas escolhidos.
+// Pix e dinheiro são o preço-base (taxa 0).
+export function taxaMaquininha(forma: FormaPagamento, parcelas: number, v: Vars = DEFAULT_VARS): number {
   switch (forma) {
-    case "Pix": mult = 1 - v.descontoPix; break;
-    case "Cartão Crédito 1x": mult = 1 + v.jurosCredito1x; break;
-    case "Cartão Crédito Parcelado": mult = parcelas * v.jurosCartaoParcela + 1; break;
-    default: mult = 1;
+    case "Cartão Débito": return v.taxaDebito;
+    case "Cartão Crédito 1x": return v.taxaCreditoVista;
+    case "Cartão Crédito Parcelado": {
+      const tabela: Record<number, number> = {
+        2: v.taxaParc2, 3: v.taxaParc3, 4: v.taxaParc4, 5: v.taxaParc5,
+        6: v.taxaParc6, 7: v.taxaParc7, 8: v.taxaParc8, 9: v.taxaParc9,
+        10: v.taxaParc10, 11: v.taxaParc11, 12: v.taxaParc12,
+      };
+      const n = Math.min(12, Math.max(2, Math.round(parcelas || 2)));
+      return tabela[n] ?? v.taxaParc12;
+    }
+    default: return 0; // Pix, Dinheiro
   }
-  const totalPagamento = total * mult;
+}
+
+export function calcularParcelamento(total: number, forma: FormaPagamento, parcelas: number, v: Vars = DEFAULT_VARS) {
+  // "Sem juros" pro cliente: embute a taxa da maquininha no preço → preço ÷ (1 − taxa),
+  // para que a loja receba o valor-base cheio depois do desconto da maquininha.
+  const taxa = taxaMaquininha(forma, parcelas, v);
+  const totalPagamento = taxa > 0 ? total / (1 - taxa) : total;
   const valorParcela = parcelas > 1 ? totalPagamento / parcelas : totalPagamento;
   return { totalPagamento, valorParcela };
 }
@@ -499,8 +532,8 @@ export const defaultPricingInput = (): PricingInput => ({
   },
   estrutura: {
     modelo: "Wave",
-    tecidoCodigo: 1130,
-    forroCodigo: 1300,
+    tecidoCodigo: 101, // Linho
+    forroCodigo: null,
     blackoutCodigo: null,
     costuraXForro: false,
     motorizada: false,
