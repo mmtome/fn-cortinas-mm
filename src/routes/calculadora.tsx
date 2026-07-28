@@ -31,6 +31,7 @@ function Calculadora() {
   const { tecidos, forros, blackouts } = useMateriais();
   const modelos = useStore((s) => s.modelos);
   const cores = useStore((s) => s.cores);
+  const vars = useStore((s) => s.vars);
   const proposals = useStore((s) => s.proposals);
   const ctx = useCalcCtx();
 
@@ -153,42 +154,43 @@ function Calculadora() {
 
             <Section title="Medidas — meça apenas a parede">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <NumField label="Largura parede" v={amb.medidas.larguraParede} set={(v) => setMedidas({ larguraParede: v })} suf="m" />
                     <NumField label="Altura parede" v={amb.medidas.alturaParede} set={(v) => setMedidas({ alturaParede: v })} suf="m" />
                   </div>
                   {amb.medidas.alturaParede > 4.5 && (
-                    <div className="mt-4 flex items-center gap-2 text-[12px] text-gold">
+                    <div className="flex items-center gap-2 text-[12px] text-gold">
                       <AlertTriangle className="w-3.5 h-3.5" /> Altura acima de 4,5m — andaime incluído.
                     </div>
                   )}
-                  <div className="mt-4">
-                    <Field label="Observações (opcional)">
-                      <input className={inputCls} value={amb.observacoes ?? ""} onChange={(e) => setAmbiente({ observacoes: e.target.value })} placeholder="Detalhes, preferências..." />
+
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground pt-1">Instalação</div>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    <Field label="Instalar no local">
+                      <div className="h-[42px] flex items-center">
+                        <Switch checked={amb.instalacao.instalar} onChange={(v) => setInstalacao({ instalar: v })} label={amb.instalacao.instalar ? "Sim" : "Não"} />
+                      </div>
+                    </Field>
+                    <Field label="Dificuldade">
+                      <select className={selectCls} value={amb.instalacao.dificuldade} onChange={(e) => setInstalacao({ dificuldade: e.target.value as any })} disabled={!amb.instalacao.instalar}>
+                        <option>Padrão</option>
+                        <option>Difícil</option>
+                      </select>
+                    </Field>
+                    <NumField label="Deslocamento" v={amb.instalacao.deslocamento} set={(v) => setInstalacao({ deslocamento: v })} suf="R$" />
+                    <Field label="Observações">
+                      <input className={inputCls} value={amb.observacoes ?? ""} onChange={(e) => setAmbiente({ observacoes: e.target.value })} placeholder="Detalhes…" />
                     </Field>
                   </div>
                 </div>
-                <div className="surface-flat rounded-xl p-6 flex items-center justify-center min-h-[180px]">
-                  <PreviewParede larguraParede={amb.medidas.larguraParede} alturaParede={amb.medidas.alturaParede} />
-                </div>
-              </div>
-            </Section>
-
-            <Section title="Instalação">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <Field label="Instalar no local" hint="Inclui colocação">
-                  <div className="h-[42px] flex items-center">
-                    <Switch checked={amb.instalacao.instalar} onChange={(v) => setInstalacao({ instalar: v })} label={amb.instalacao.instalar ? "Sim" : "Não"} />
+                <div className="surface-flat rounded-xl p-5 space-y-4">
+                  <div className="flex items-center justify-center min-h-[140px]">
+                    <PreviewParede larguraParede={amb.medidas.larguraParede} alturaParede={amb.medidas.alturaParede} />
                   </div>
-                </Field>
-                <Field label="Dificuldade">
-                  <select className={selectCls} value={amb.instalacao.dificuldade} onChange={(e) => setInstalacao({ dificuldade: e.target.value as any })} disabled={!amb.instalacao.instalar}>
-                    <option>Padrão</option>
-                    <option>Difícil</option>
-                  </select>
-                </Field>
-                <NumField label="Deslocamento" v={amb.instalacao.deslocamento} set={(v) => setInstalacao({ deslocamento: v })} suf="R$" />
+                  <div className="hairline" />
+                  <PreviewCorte L={amb.medidas.larguraParede} H={amb.medidas.alturaParede} vars={vars} />
+                </div>
               </div>
             </Section>
 
@@ -397,6 +399,65 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div>
       <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-4">{title}</div>
       {children}
+    </div>
+  );
+}
+
+function PreviewCorte({ L, H, vars }: { L: number; H: number; vars: any }) {
+  const util = vars?.larguraUtilRolo ?? 2.85;
+  const rolo = vars?.larguraRolo ?? 3;
+  const fator = vars?.fatorTecido ?? 3;
+  const casoB = H > util;
+  const nPanos = Math.max(1, Math.ceil((L * fator) / rolo));
+  const W = 220, Hh = 108;
+  const gold = "var(--gold)";
+  const fill = "oklch(0.80 0.10 88 / 0.10)";
+  const rollCor = "oklch(0.55 0.02 260)";
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Corte do tecido</span>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full transition-colors ${casoB ? "text-gold bg-[oklch(0.80_0.10_88_/_0.10)]" : "text-[oklch(0.78_0.10_150)] bg-[oklch(0.55_0.12_150_/_0.12)]"}`}>
+          {casoB ? "Virou o rolo ↻" : "Rolo em pé"}
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${Hh}`} width="100%" className="max-w-[240px] mx-auto block">
+        {casoB ? (
+          (() => {
+            const n = Math.min(nPanos, 7);
+            const areaX = 30, areaW = W - 44, gap = 5;
+            const pw = (areaW - gap * (n - 1)) / n;
+            return (
+              <>
+                {/* rolo virado na vertical */}
+                <rect x={8} y={16} width={13} height={74} rx={6.5} fill={rollCor} />
+                <line x1={14.5} y1={20} x2={14.5} y2={86} stroke="oklch(0.72 0.02 260)" strokeWidth={1} strokeDasharray="2 3" />
+                {/* panos verticais emendados */}
+                {Array.from({ length: n }).map((_, i) => (
+                  <rect key={i} x={areaX + i * (pw + gap)} y={14} width={pw} height={78} rx={2} fill={fill} stroke={gold} strokeWidth={1.2} />
+                ))}
+                <text x={areaX + areaW / 2} y={104} fontSize={9} fill={gold} textAnchor="middle">{nPanos} {nPanos > 1 ? "panos verticais" : "pano vertical"}</text>
+              </>
+            );
+          })()
+        ) : (
+          <>
+            {/* rolo deitado na horizontal */}
+            <rect x={12} y={44} width={70} height={13} rx={6.5} fill={rollCor} />
+            <line x1={16} y1={50.5} x2={78} y2={50.5} stroke="oklch(0.72 0.02 260)" strokeWidth={1} strokeDasharray="2 3" />
+            {/* uma peça, cortada em pé */}
+            <rect x={42} y={28} width={W - 60} height={46} rx={2} fill={fill} stroke={gold} strokeWidth={1.2} />
+            <line x1={42} y1={51} x2={W - 18} y2={51} stroke={gold} strokeWidth={0.6} strokeDasharray="3 3" opacity={0.5} />
+            <text x={(W - 18 + 42) / 2} y={100} fontSize={9} fill={gold} textAnchor="middle">1 peça — corta em pé</text>
+          </>
+        )}
+      </svg>
+      <div className="text-[10px] text-muted-foreground mt-1.5 text-center leading-relaxed">
+        {casoB
+          ? `Altura ${H} m passou de ${util} m → vira o rolo e emenda ${nPanos} ${nPanos > 1 ? "panos" : "pano"}.`
+          : `Altura ${H} m cabe em ${util} m (largura do rolo) → corta em pé.`}
+      </div>
     </div>
   );
 }
