@@ -5,7 +5,7 @@ import jsPDF from "jspdf";
 
 import { PageHeader, Card, GoldButton, Modal, Field, NumberInput, selectCls, inputCls, formatDate } from "@/components/ui-kit";
 import { useStore, store, useCalcCtx, useMateriais } from "@/lib/store";
-import { calcularProposta, calcularOrcamento, formatBRL, type Tecido, type ComercialInput, type PropostaResult, type OpcaoResult } from "@/lib/pricing-engine";
+import { calcularProposta, calcularOrcamento, formatBRL, type Tecido, type ComercialInput, type PropostaResult, type AmbienteResult } from "@/lib/pricing-engine";
 import type { ComodoData } from "@/lib/mockData";
 import { gerarQRWhatsApp, whatsappUrl } from "@/lib/qr";
 import { toast } from "sonner";
@@ -54,13 +54,13 @@ function Proposta() {
   useEffect(() => { setComercial(proposal?.comercial); }, [proposal?.id]);
 
   const comodos = proposal?.comodos ?? [];
-  const isOpcoes = !!(proposal?.opcoes && proposal.opcoes.length);
+  const isOpcoes = !!(proposal?.ambientes && proposal.ambientes.length);
   const res: PropostaResult | undefined = useMemo(
-    () => (proposal && comodos.length ? calcularProposta(comodos, comercial ?? proposal.comercial, ctx) : undefined),
-    [proposal, comodos, comercial, ctx]
+    () => (proposal && !isOpcoes && comodos.length ? calcularProposta(comodos, comercial ?? proposal.comercial, ctx) : undefined),
+    [proposal, isOpcoes, comodos, comercial, ctx]
   );
-  const resultado: OpcaoResult[] = useMemo(
-    () => (proposal && isOpcoes ? calcularOrcamento(proposal.ambientes ?? [], proposal.opcoes ?? [], comercial ?? proposal.comercial, ctx) : []),
+  const resultado: AmbienteResult[] = useMemo(
+    () => (proposal && isOpcoes ? calcularOrcamento(proposal.ambientes ?? [], comercial ?? proposal.comercial, ctx) : []),
     [proposal, isOpcoes, comercial, ctx]
   );
 
@@ -68,7 +68,7 @@ function Proposta() {
 
   const salvarAjustesOpcoes = () => {
     if (!proposal || !comercial) return;
-    store.upsertProposal({ ...proposal, comercial, valor: resultado[0]?.aVistaTotal ?? proposal.valor });
+    store.upsertProposal({ ...proposal, comercial, valor: resultado[0]?.opcoes[0]?.aVista ?? proposal.valor });
     toast.success("Ajustes salvos na proposta");
   };
 
@@ -704,43 +704,35 @@ function DocumentoPreviewOpcoes({ proposal, resultado, empresa, validadeISO, tec
         </div>
 
         <div className="mt-6 space-y-7">
-          {resultado.map((op: OpcaoResult, i: number) => (
+          {resultado.map((amb: AmbienteResult, i: number) => (
             <div key={i}>
-              <div className="text-[13px] font-semibold">{op.nome}</div>
+              <div className="flex items-baseline justify-between gap-2">
+                <div className="text-[13px] font-semibold">{amb.ambiente}{amb.quant > 1 ? ` · ${amb.quant}×` : ""}</div>
+                <div className="text-[10px] text-[var(--navy-deep)]/55">{amb.medidas.larguraParede} × {amb.medidas.alturaParede} m</div>
+              </div>
               <div className="w-8 h-[2px] bg-[var(--gold)] my-1.5" />
-              <div className="text-[10px] text-[var(--navy-deep)]/55 mb-2">{descreverOpcao(op.estrutura, tecidos, forros, blackouts)}</div>
               <div className="overflow-x-auto">
                 <table className="w-full text-[11px] border-collapse">
                   <thead>
                     <tr className="text-[9px] uppercase tracking-wide text-[var(--navy-deep)]/50 bg-[var(--navy-deep)]/[0.04]">
-                      <th className="text-left font-medium py-1.5 px-2">Ambiente</th>
-                      <th className="text-center font-medium py-1.5 px-1">Qtd</th>
-                      <th className="text-right font-medium py-1.5 px-1">Larg</th>
-                      <th className="text-right font-medium py-1.5 px-1">Alt</th>
+                      <th className="text-left font-medium py-1.5 px-2">Opção</th>
                       <th className="text-right font-medium py-1.5 px-2">À vista</th>
                       <th className="text-right font-medium py-1.5 px-2">{parcelas}x</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {op.linhas.map((l, j) => (
+                    {amb.opcoes.map((op, j) => (
                       <tr key={j} className="border-b border-[var(--navy-deep)]/[0.06]">
-                        <td className="py-1.5 px-2">{l.ambiente}</td>
-                        <td className="text-center px-1">{l.quant}</td>
-                        <td className="text-right px-1">{l.medidas.larguraParede.toFixed(2)}</td>
-                        <td className="text-right px-1">{l.medidas.alturaParede.toFixed(2)}</td>
-                        <td className="text-right px-2 stat">{formatBRL(l.aVista)}</td>
-                        <td className="text-right px-2 stat text-[var(--navy-deep)]/60">{formatBRL(l.parcelado)}</td>
+                        <td className="py-1.5 px-2">
+                          <div className="font-medium">{op.nome}</div>
+                          <div className="text-[9px] text-[var(--navy-deep)]/50">{descreverOpcao(op.estrutura, tecidos, forros, blackouts)}</div>
+                        </td>
+                        <td className="text-right px-2 stat align-top pt-1.5">{formatBRL(op.aVista)}</td>
+                        <td className="text-right px-2 stat text-[var(--navy-deep)]/60 align-top pt-1.5">{formatBRL(op.parcelado)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
-              <div className="mt-2 rounded-lg bg-[var(--navy-deep)] text-white px-4 py-2.5 flex items-center justify-between">
-                <span className="text-[10px] uppercase tracking-wide text-gold">Total</span>
-                <span className="text-[12px]">
-                  <span className="stat font-semibold">{formatBRL(op.aVistaTotal)}</span> à vista
-                  <span className="text-white/50"> · {parcelas}x de {formatBRL(op.parceladoTotal / parcelas)}</span>
-                </span>
               </div>
             </div>
           ))}
@@ -811,52 +803,43 @@ async function gerarPDFOpcoes({ proposal, resultado, comercial, empresa, validad
   y += 62;
 
   // Colunas
-  const xQ = 250, xL = 300, xA = 356, xV = 470, xP = w - M;
+  const xV = w - M - 130, xP = w - M;
   const ensure = (need: number) => { if (y + need > h - M - 24) { doc.addPage(); y = M + 14; } };
 
-  resultado.forEach((op: OpcaoResult) => {
-    ensure(96);
+  resultado.forEach((amb: AmbienteResult) => {
+    ensure(70);
+    // Cabeçalho do ambiente
     doc.setTextColor(...ink); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-    doc.text(op.nome, M, y);
+    doc.text(amb.ambiente + (amb.quant > 1 ? `  ·  ${amb.quant}×` : ""), M, y);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...soft);
+    doc.text(`${amb.medidas.larguraParede} × ${amb.medidas.alturaParede} m`, w - M, y, { align: "right" });
     doc.setDrawColor(...gold); doc.setLineWidth(1); doc.line(M, y + 5, M + 40, y + 5);
     y += 16;
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...soft);
-    doc.text(descreverOpcao(op.estrutura, tecidos, forros, blackouts), M, y);
-    y += 12;
 
+    // Cabeçalho da tabela de opções
     doc.setFillColor(...head); doc.rect(M - 6, y - 9, w - 2 * M + 12, 18, "F");
     doc.setTextColor(...soft); doc.setFont("helvetica", "bold"); doc.setFontSize(7.5);
-    doc.text("AMBIENTE", M, y + 3.5);
-    doc.text("QTD", xQ, y + 3.5);
-    doc.text("LARG", xL, y + 3.5);
-    doc.text("ALT", xA, y + 3.5);
+    doc.text("OPÇÃO", M, y + 3.5);
     doc.text("À VISTA", xV, y + 3.5, { align: "right" });
     doc.text(`${parcelas}X`, xP, y + 3.5, { align: "right" });
     y += 20;
 
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-    op.linhas.forEach((l) => {
-      ensure(22);
-      doc.setTextColor(...ink);
-      doc.text(String(l.ambiente).slice(0, 34), M, y);
-      doc.text(String(l.quant), xQ, y);
-      doc.text(l.medidas.larguraParede.toFixed(2), xL, y);
-      doc.text(l.medidas.alturaParede.toFixed(2), xA, y);
-      doc.text(formatBRL(l.aVista), xV, y, { align: "right" });
+    amb.opcoes.forEach((op) => {
+      ensure(28);
+      doc.setTextColor(...ink); doc.setFont("helvetica", "bold"); doc.setFontSize(9.5);
+      doc.text(op.nome, M, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(formatBRL(op.aVista), xV, y, { align: "right" });
       doc.setTextColor(...soft);
-      doc.text(formatBRL(l.parcelado), xP, y, { align: "right" });
+      doc.text(formatBRL(op.parcelado), xP, y, { align: "right" });
+      y += 11;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...soft);
+      doc.text(descreverOpcao(op.estrutura, tecidos, forros, blackouts).slice(0, 80), M, y);
       y += 8;
       doc.setDrawColor(...line); doc.setLineWidth(0.4); doc.line(M - 6, y, w - M + 6, y);
-      y += 12;
+      y += 11;
     });
-
-    ensure(34);
-    doc.setFillColor(...navy); doc.roundedRect(M - 6, y - 4, w - 2 * M + 12, 26, 3, 3, "F");
-    doc.setTextColor(...gold); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
-    doc.text("TOTAL", M, y + 12);
-    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
-    doc.text(`${formatBRL(op.aVistaTotal)} à vista   ·   ${parcelas}x de ${formatBRL(op.parceladoTotal / parcelas)}`, xP, y + 12, { align: "right" });
-    y += 44;
+    y += 12;
   });
 
   // Condições

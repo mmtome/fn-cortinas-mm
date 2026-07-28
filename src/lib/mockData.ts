@@ -8,7 +8,6 @@ import {
   type ComercialInput,
   type CalcResult,
   type AmbienteItem,
-  type OpcaoItem,
 } from "./pricing-engine";
 
 export type ProposalStatus = "Pendente" | "Aprovado" | "Perdido";
@@ -25,8 +24,7 @@ export interface Proposal {
   endereco: string;           // endereço do cliente
   contato: string;            // telefone/contato do cliente
   comodos: ComodoData[];      // formato antigo (1 config por cômodo)
-  ambientes?: AmbienteItem[]; // novo formato: ambientes (medidas)
-  opcoes?: OpcaoItem[];       // novo formato: opções de materiais comparadas
+  ambientes?: AmbienteItem[]; // novo formato: cada ambiente com suas opções
   comercial: ComercialInput;  // condições da proposta inteira
   valor: number;              // total final agregado
   status: ProposalStatus;

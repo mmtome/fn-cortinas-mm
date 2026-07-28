@@ -524,68 +524,81 @@ export function calcularProposta(comodos: ComodoInput[], comercial: ComercialInp
 }
 
 // ============================================================
-// ORÇAMENTO POR OPÇÕES
-// Ambientes (medidas) são cadastrados uma vez; cada opção é uma
-// configuração de materiais aplicada a todos os ambientes.
+// ORÇAMENTO — cada ambiente tem SUAS PRÓPRIAS opções (estilo Karla).
 // ============================================================
-export interface AmbienteItem {
-  ambiente: string;
-  observacoes?: string;
-  quant: number;              // quantidade de cortinas iguais nesse ambiente
-  medidas: MedidasInput;
-  instalacao: InstalacaoInput;
-}
-
 export interface OpcaoItem {
   nome: string;               // ex: "Só cortina", "+ Blackout 80%"
   estrutura: EstruturaInput;  // materiais dessa opção
 }
 
-export interface LinhaOpcao {
+export interface AmbienteItem {
   ambiente: string;
-  quant: number;
+  observacoes?: string;
+  quant: number;              // qtd de cortinas iguais nesse ambiente
   medidas: MedidasInput;
-  result: CalcResult;
-  aVista: number;             // totalFinal × quant
-  parcelado: number;          // aVista ÷ (1 − taxa das parcelas)
+  instalacao: InstalacaoInput;
+  opcoes: OpcaoItem[];        // opções próprias deste ambiente
 }
 
-export interface OpcaoResult {
+export interface OpcaoCalc {
   nome: string;
   estrutura: EstruturaInput;
-  linhas: LinhaOpcao[];
-  aVistaTotal: number;
-  parceladoTotal: number;
+  result: CalcResult;
+  aVista: number;             // totalFinal × quant
+  parcelado: number;          // aVista ÷ (1 − taxa)
+}
+
+export interface AmbienteResult {
+  ambiente: string;
+  observacoes?: string;
+  quant: number;
+  medidas: MedidasInput;
+  opcoes: OpcaoCalc[];
   parcelas: number;
+}
+
+export function defaultOpcao(nome = "Só cortina"): OpcaoItem {
+  const e = defaultPricingInput().estrutura;
+  return { nome, estrutura: { ...e, forroCodigo: null, blackoutCodigo: null } };
+}
+
+/** Nome automático da opção conforme os materiais (sempre bate com o conteúdo). */
+export function nomeOpcao(e: EstruturaInput, blackouts: Tecido[] = CATALOGO_BLACKOUTS): string {
+  const parts: string[] = [];
+  if (e.forroCodigo != null) parts.push("Forro");
+  if (e.blackoutCodigo != null) {
+    const bk = blackouts.find((b) => b.codigo === e.blackoutCodigo);
+    parts.push(bk ? bk.nome : "Blackout");
+  }
+  return parts.length ? "+ " + parts.join(" + ") : "Só cortina";
 }
 
 export function defaultAmbiente(): AmbienteItem {
   const base = defaultPricingInput();
-  return { ambiente: "Sala de Estar", observacoes: "", quant: 1, medidas: base.medidas, instalacao: base.instalacao };
-}
-
-export function defaultOpcao(nome = "Só cortina"): OpcaoItem {
-  return { nome, estrutura: defaultPricingInput().estrutura };
+  return {
+    ambiente: "Sala de Estar", observacoes: "", quant: 1,
+    medidas: base.medidas, instalacao: base.instalacao,
+    opcoes: [defaultOpcao("Só cortina")],
+  };
 }
 
 /**
- * Cada opção (materiais) é aplicada a todos os ambientes. Para cada ambiente
- * calcula o valor à vista (base) e o parcelado (à vista ÷ (1 − taxa)).
+ * Cada ambiente tem suas próprias opções. Para cada opção calcula o valor à
+ * vista (base) e o parcelado (à vista ÷ (1 − taxa)).
  */
 export function calcularOrcamento(
   ambientes: AmbienteItem[],
-  opcoes: OpcaoItem[],
   comercial: ComercialInput,
   ctx: CalcCtx = {}
-): OpcaoResult[] {
+): AmbienteResult[] {
   const v: Vars = { ...DEFAULT_VARS, ...ctx.vars };
   const parcelas = Math.min(12, Math.max(2, comercial.parcelas || 10));
   const taxa = taxaMaquininha("Cartão Crédito Parcelado", parcelas, v);
   const grossUp = (x: number) => +(taxa > 0 ? x / (1 - taxa) : x).toFixed(2);
 
-  return opcoes.map((op) => {
-    const linhas: LinhaOpcao[] = ambientes.map((amb) => {
-      const quant = amb.quant || 1;
+  return ambientes.map((amb) => {
+    const quant = amb.quant || 1;
+    const opcoes: OpcaoCalc[] = (amb.opcoes ?? []).map((op) => {
       const result = calcular(
         {
           ambiente: { cliente: "", ambiente: amb.ambiente, observacoes: amb.observacoes },
@@ -597,10 +610,9 @@ export function calcularOrcamento(
         ctx
       );
       const aVista = +(result.totalFinal * quant).toFixed(2);
-      return { ambiente: amb.ambiente, quant, medidas: amb.medidas, result, aVista, parcelado: grossUp(aVista) };
+      return { nome: nomeOpcao(op.estrutura, ctx.blackouts ?? CATALOGO_BLACKOUTS), estrutura: op.estrutura, result, aVista, parcelado: grossUp(aVista) };
     });
-    const aVistaTotal = +linhas.reduce((s, l) => s + l.aVista, 0).toFixed(2);
-    return { nome: op.nome, estrutura: op.estrutura, linhas, aVistaTotal, parceladoTotal: grossUp(aVistaTotal), parcelas };
+    return { ambiente: amb.ambiente, observacoes: amb.observacoes, quant, medidas: amb.medidas, opcoes, parcelas };
   });
 }
 

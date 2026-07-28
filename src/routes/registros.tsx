@@ -182,17 +182,18 @@ function ClienteCard({ proposal, onClose }: { proposal: Proposal | null; onClose
       </div>
 
       {/* Detalhamento */}
-      {p.opcoes && p.opcoes.length ? (
+      {p.ambientes && p.ambientes.length ? (
         <>
           <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-2">
-            {p.ambientes?.length ?? 0} {(p.ambientes?.length ?? 0) === 1 ? "ambiente" : "ambientes"} · {p.opcoes.length} {p.opcoes.length === 1 ? "opção" : "opções"}
+            {p.ambientes.length} {p.ambientes.length === 1 ? "ambiente" : "ambientes"}
           </div>
           <div className="space-y-1.5 mb-5">
-            {p.ambientes?.map((a, i) => (
+            {p.ambientes.map((a, i) => (
               <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/[0.02]">
                 <div className="flex items-center gap-2 min-w-0">
                   <Home className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                   <span className="text-[12px] truncate">{a.ambiente}{a.quant > 1 ? ` ×${a.quant}` : ""}</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">· {a.opcoes?.length ?? 0} {(a.opcoes?.length ?? 0) === 1 ? "opção" : "opções"}</span>
                 </div>
                 <span className="text-[11px] text-muted-foreground shrink-0">{a.medidas.larguraParede} × {a.medidas.alturaParede} m</span>
               </div>

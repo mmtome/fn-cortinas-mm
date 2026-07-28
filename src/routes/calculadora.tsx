@@ -6,8 +6,8 @@ import { PageHeader, GoldButton, Field, Switch, NumberInput, inputCls, selectCls
 import {
   calcularOrcamento,
   defaultAmbiente,
-  defaultOpcao,
   defaultPricingInput,
+  nomeOpcao,
   formatBRL,
   type AmbienteItem,
   type OpcaoItem,
@@ -38,12 +38,12 @@ function Calculadora() {
   const [endereco, setEndereco] = useState("");
   const [contato, setContato] = useState("");
   const [ambientes, setAmbientes] = useState<AmbienteItem[]>([defaultAmbiente()]);
-  const [opcoes, setOpcoes] = useState<OpcaoItem[]>([{ ...defaultOpcao("Só cortina"), estrutura: { ...defaultPricingInput().estrutura, forroCodigo: null, blackoutCodigo: null } }]);
   const [comercial, setComercial] = useState<ComercialInput>({ ...defaultPricingInput().comercial, parcelas: 10 });
   const [active, setActive] = useState(0);
 
-  const resultado = useMemo(() => calcularOrcamento(ambientes, opcoes, comercial, ctx), [ambientes, opcoes, comercial, ctx]);
+  const resultado = useMemo(() => calcularOrcamento(ambientes, comercial, ctx), [ambientes, comercial, ctx]);
   const amb = ambientes[active];
+  const ambRes = resultado[active];
 
   // ---- Ambientes ----
   const setAmbiente = (patch: Partial<AmbienteItem>) => setAmbientes((as) => as.map((a, i) => (i === active ? { ...a, ...patch } : a)));
@@ -56,10 +56,11 @@ function Calculadora() {
     setActive((a) => Math.max(0, Math.min(a > i ? a - 1 : a, ambientes.length - 2)));
   };
 
-  // ---- Opções ----
+  // ---- Opções DO AMBIENTE ATIVO ----
+  const opcoes = amb.opcoes;
+  const setOpcoes = (fn: (os: OpcaoItem[]) => OpcaoItem[]) => setAmbiente({ opcoes: fn(amb.opcoes) });
   const setOpcao = (i: number, patch: Partial<EstruturaInput>) =>
     setOpcoes((os) => os.map((o, idx) => (idx === i ? { ...o, estrutura: { ...o.estrutura, ...patch } } : o)));
-  const setOpcaoNome = (i: number, nome: string) => setOpcoes((os) => os.map((o, idx) => (idx === i ? { ...o, nome } : o)));
   const removeOpcao = (i: number) => setOpcoes((os) => (os.length <= 1 ? os : os.filter((_, idx) => idx !== i)));
 
   const forroPadrao = forros[0]?.codigo ?? null;
@@ -85,8 +86,8 @@ function Calculadora() {
       numero,
       cliente, endereco, contato,
       comodos: [],
-      ambientes, opcoes, comercial,
-      valor: resultado[0]?.aVistaTotal ?? 0,
+      ambientes, comercial,
+      valor: resultado[0]?.opcoes[0]?.aVista ?? 0,
       status: "Pendente",
       data: new Date().toISOString().slice(0, 10),
       ambiente: label || "Orçamento",
@@ -97,7 +98,7 @@ function Calculadora() {
 
   return (
     <>
-      <PageHeader eyebrow="Atendimento" title="Nova precificação" subtitle="Cadastre os ambientes uma vez e compare várias opções (cortina, forro, blackout). O preço sai por opção." />
+      <PageHeader eyebrow="Atendimento" title="Nova precificação" subtitle="Cada cômodo tem suas próprias opções (só cortina, forro, blackout). No PDF, cada ambiente vira um bloco." />
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-8">
         <div className="space-y-5">
@@ -127,6 +128,7 @@ function Calculadora() {
                   className={`group inline-flex items-center gap-2 pl-3 pr-2 py-2 rounded-lg border text-[12px] transition-colors ${i === active ? "border-[oklch(0.80_0.10_88_/_0.4)] bg-[oklch(0.80_0.10_88_/_0.06)] text-foreground" : "border-white/[0.06] text-muted-foreground hover:text-foreground hover:bg-white/[0.03]"}`}>
                   <Home className={`w-3.5 h-3.5 ${i === active ? "text-gold" : ""}`} />
                   <span className="max-w-[140px] truncate">{a.ambiente || `Ambiente ${i + 1}`}</span>
+                  <span className="text-[10px] text-muted-foreground">{a.opcoes.length} {a.opcoes.length === 1 ? "opção" : "opções"}</span>
                   {ambientes.length > 1 && (
                     <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); removeAmbiente(i); }} className="ml-1 p-0.5 rounded text-muted-foreground hover:text-[oklch(0.72_0.16_25)]" aria-label="Remover ambiente">
                       <Trash2 className="w-3 h-3" />
@@ -189,35 +191,31 @@ function Calculadora() {
                 <NumField label="Deslocamento" v={amb.instalacao.deslocamento} set={(v) => setInstalacao({ deslocamento: v })} suf="R$" />
               </div>
             </Section>
-          </div>
 
-          {/* Opções */}
-          <div className="surface rounded-2xl p-5 sm:p-7 space-y-5">
-            <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-gold" />
-              <div className="text-[13px] font-medium">Opções para comparar</div>
-              <span className="text-[11px] text-muted-foreground">· {opcoes.length}</span>
-            </div>
-            <div className="text-[12px] text-muted-foreground -mt-2">Cada opção é uma configuração de materiais aplicada a todos os ambientes. No PDF, cada opção vira uma tabela.</div>
-
-            <div className="space-y-4">
-              {opcoes.map((o, i) => (
-                <OpcaoCard
-                  key={i} idx={i} opcao={o} total={resultado[i]}
-                  tecidos={tecidos} forros={forros} blackouts={blackouts} modelos={modelos} cores={cores}
-                  onNome={(n: string) => setOpcaoNome(i, n)} onSet={(p: Partial<EstruturaInput>) => setOpcao(i, p)}
-                  onRemove={opcoes.length > 1 ? () => removeOpcao(i) : undefined}
-                />
-              ))}
-            </div>
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              {PRESETS.map((p) => (
-                <button key={p.nome} onClick={() => addOpcao(p)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-white/[0.12] text-[12px] text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors">
-                  <Plus className="w-3.5 h-3.5" /> {p.nome}
-                </button>
-              ))}
-            </div>
+            {/* Opções deste ambiente */}
+            <Section title={`Opções de "${amb.ambiente}" — o cliente escolhe uma`}>
+              <div className="flex items-center gap-2 mb-4">
+                <Layers className="w-4 h-4 text-gold" />
+                <div className="text-[12px] text-muted-foreground">{opcoes.length} {opcoes.length === 1 ? "opção" : "opções"} neste ambiente</div>
+              </div>
+              <div className="space-y-4">
+                {opcoes.map((o, i) => (
+                  <OpcaoCard
+                    key={i} idx={i} opcao={o} calc={ambRes?.opcoes[i]}
+                    tecidos={tecidos} forros={forros} blackouts={blackouts} modelos={modelos} cores={cores}
+                    onSet={(p: Partial<EstruturaInput>) => setOpcao(i, p)}
+                    onRemove={opcoes.length > 1 ? () => removeOpcao(i) : undefined}
+                  />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2 pt-4">
+                {PRESETS.map((p) => (
+                  <button key={p.nome} onClick={() => addOpcao(p)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-white/[0.12] text-[12px] text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors">
+                    <Plus className="w-3.5 h-3.5" /> {p.nome}
+                  </button>
+                ))}
+              </div>
+            </Section>
           </div>
 
           {/* Fechamento */}
@@ -236,7 +234,7 @@ function Calculadora() {
                 <NumberInput value={comercial.parcelas} onChange={(n) => setC({ parcelas: n })} min={2} max={12} integer />
               </Field>
               <div className="md:col-span-2">
-                <Field label={`Desconto · ${comercial.desconto}%`} hint="Aplicado sobre o total de cada opção">
+                <Field label={`Desconto · ${comercial.desconto}%`} hint="Aplicado sobre cada opção">
                   <input type="range" min={0} max={20} step={1} className="w-full accent-[var(--gold)]" value={comercial.desconto} onChange={(e) => setC({ desconto: +e.target.value })} />
                 </Field>
               </div>
@@ -250,21 +248,25 @@ function Calculadora() {
           </div>
         </div>
 
-        {/* Resumo lateral: totais por opção */}
+        {/* Resumo lateral: por ambiente */}
         <div className="hidden xl:block xl:sticky xl:top-6 self-start space-y-3">
           <div className="surface rounded-2xl p-6">
             <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Resumo</div>
             <div className="text-[14px] mt-2 font-medium">{cliente || "Novo cliente"}</div>
-            <div className="text-[11px] text-muted-foreground">{ambientes.length} {ambientes.length > 1 ? "ambientes" : "ambiente"} · {opcoes.length} {opcoes.length > 1 ? "opções" : "opção"}</div>
+            <div className="text-[11px] text-muted-foreground">{ambientes.length} {ambientes.length > 1 ? "ambientes" : "ambiente"}</div>
             <div className="hairline my-5" />
-            <div className="space-y-3">
-              {resultado.map((op, i) => (
+            <div className="space-y-4">
+              {resultado.map((r, i) => (
                 <div key={i}>
-                  <div className="flex justify-between items-baseline gap-2">
-                    <span className="text-[12px] text-foreground truncate">{op.nome}</span>
-                    <span className="stat text-[14px] text-gold shrink-0">{formatBRL(op.aVistaTotal)}</span>
+                  <div className="text-[12px] font-medium text-foreground truncate mb-1.5">{r.ambiente || `Ambiente ${i + 1}`}</div>
+                  <div className="space-y-1">
+                    {r.opcoes.map((op, j) => (
+                      <div key={j} className="flex justify-between items-baseline gap-2 text-[11px]">
+                        <span className="text-muted-foreground truncate">{op.nome}</span>
+                        <span className="stat text-gold shrink-0">{formatBRL(op.aVista)}</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-[10px] text-muted-foreground text-right">à vista · {op.parcelas}x de {formatBRL(op.parceladoTotal / op.parcelas)}</div>
                 </div>
               ))}
             </div>
@@ -276,16 +278,18 @@ function Calculadora() {
 }
 
 // =========================================================
-// Card de uma opção
+// Card de uma opção (forro/blackout aparecem só quando adicionados)
 // =========================================================
-function OpcaoCard({ idx, opcao, total, tecidos, forros, blackouts, modelos, cores, onNome, onSet, onRemove }: any) {
+function OpcaoCard({ idx, opcao, calc, tecidos, forros, blackouts, modelos, cores, onSet, onRemove }: any) {
   const e: EstruturaInput = opcao.estrutura;
+  const forroPadrao = forros[0]?.codigo ?? null;
+  const blackoutPadrao = blackouts[0]?.codigo ?? null;
   return (
     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-5">
       <div className="flex items-center gap-3 mb-4">
         <span className="w-6 h-6 rounded-md bg-[oklch(0.80_0.10_88_/_0.12)] text-gold text-[11px] font-medium flex items-center justify-center shrink-0">{idx + 1}</span>
-        <input className={`${inputCls} py-1.5`} value={opcao.nome} onChange={(ev) => onNome(ev.target.value)} placeholder="Nome da opção" />
-        {total && <span className="stat text-[14px] text-gold shrink-0">{formatBRL(total.aVistaTotal)}</span>}
+        <div className="flex-1 text-[13px] font-medium truncate">{nomeOpcao(e, blackouts)}</div>
+        {calc && <span className="stat text-[14px] text-gold shrink-0">{formatBRL(calc.aVista)}</span>}
         {onRemove && (
           <button onClick={onRemove} aria-label="Remover opção" className="p-1.5 rounded-md text-muted-foreground hover:text-[oklch(0.72_0.16_25)] shrink-0">
             <Trash2 className="w-3.5 h-3.5" />
@@ -315,26 +319,50 @@ function OpcaoCard({ idx, opcao, total, tecidos, forros, blackouts, modelos, cor
             {cores.map((c: string) => <option key={c} value={c}>{c}</option>)}
           </select>
         </Field>
-        <Field label="Forro">
-          <select className={selectCls} value={e.forroCodigo ?? "none"} onChange={(ev) => onSet({ forroCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
-            <option value="none">Sem forro</option>
-            {forros.map((t: any) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
-          </select>
-        </Field>
-        <Field label="Blackout">
-          <select className={selectCls} value={e.blackoutCodigo ?? "none"} onChange={(ev) => onSet({ blackoutCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
-            <option value="none">Sem blackout</option>
-            {blackouts.map((t: any) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
-          </select>
-        </Field>
+
+        {/* Forro — só quando adicionado */}
         {e.forroCodigo != null && (
-          <Field label="Forro costurado junto" hint="Trilho permanece simples">
-            <div className="h-[42px] flex items-center">
-              <Switch checked={e.costuraXForro} onChange={(v) => onSet({ costuraXForro: v })} label={e.costuraXForro ? "Sim" : "Não"} />
-            </div>
+          <>
+            <Field label="Forro">
+              <select className={selectCls} value={e.forroCodigo} onChange={(ev) => onSet({ forroCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
+                {forros.map((t: any) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
+                <option value="none">Remover forro</option>
+              </select>
+            </Field>
+            <Field label="Forro costurado junto" hint="Trilho permanece simples">
+              <div className="h-[42px] flex items-center">
+                <Switch checked={e.costuraXForro} onChange={(v) => onSet({ costuraXForro: v })} label={e.costuraXForro ? "Sim" : "Não"} />
+              </div>
+            </Field>
+          </>
+        )}
+
+        {/* Blackout — só quando adicionado */}
+        {e.blackoutCodigo != null && (
+          <Field label="Blackout">
+            <select className={selectCls} value={e.blackoutCodigo} onChange={(ev) => onSet({ blackoutCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
+              {blackouts.map((t: any) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
+              <option value="none">Remover blackout</option>
+            </select>
           </Field>
         )}
       </div>
+
+      {/* Botões para adicionar forro/blackout */}
+      {(e.forroCodigo == null || e.blackoutCodigo == null) && (
+        <div className="flex flex-wrap gap-2 mt-4">
+          {e.forroCodigo == null && (
+            <button onClick={() => onSet({ forroCodigo: forroPadrao, costuraXForro: true })} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-white/[0.12] text-[11px] text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors">
+              <Plus className="w-3 h-3" /> Adicionar forro
+            </button>
+          )}
+          {e.blackoutCodigo == null && (
+            <button onClick={() => onSet({ blackoutCodigo: blackoutPadrao })} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-white/[0.12] text-[11px] text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors">
+              <Plus className="w-3 h-3" /> Adicionar blackout
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
