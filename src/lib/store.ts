@@ -52,8 +52,15 @@ type State = {
   modelos: ModeloItem[];
   cores: string[];
   vars: Vars;
+  varsVersion: number; // versão da calibração de preços — ver VARS_VERSION
   empresa: Empresa;
 };
+
+// Bump sempre que os preços/fatores padrão forem recalibrados. Ao subir a versão,
+// o app re-sincroniza a tabela de preços com os valores novos (mantendo estoque,
+// clientes e empresa). Assim uma calibração no código chega a quem já usava o app.
+//   v2: entretela R$1/m e trilho duplo R$25/m (bate com a folha 1.802,42)
+const VARS_VERSION = 2;
 
 // v3: estoque vira fonte única dos materiais (tecidos/forros/blackouts derivam
 // do estoque). Mudança estrutural — recomeça do seed novo.
@@ -67,6 +74,7 @@ function defaultState(): State {
     modelos: CATALOGO_MODELOS.map((m) => ({ ...m })),
     cores: [...CATALOGO_CORES],
     vars: { ...DEFAULT_VARS },
+    varsVersion: VARS_VERSION,
     empresa: { ...defaultEmpresa },
   };
 }
@@ -158,8 +166,13 @@ function hydrate() {
       clientes: saved.clientes ?? base.clientes,
       modelos: saved.modelos ?? base.modelos,
       cores: saved.cores ?? base.cores,
-      // mescla vars para não perder chaves novas em versões futuras
-      vars: { ...base.vars, ...saved.vars },
+      // Preços recalibrados no código? Re-sincroniza a tabela com os valores novos.
+      // Enquanto a versão salva for a atual, mescla (preserva ajustes do usuário e
+      // ganha chaves novas). Se estiver desatualizada, adota os padrões calibrados.
+      vars: saved.varsVersion === VARS_VERSION
+        ? { ...base.vars, ...saved.vars }
+        : { ...base.vars },
+      varsVersion: VARS_VERSION,
       // empresa: usa o valor salvo se preenchido; senão, cai no padrão (pré-preenchidos)
       empresa: mergeEmpresa(base.empresa, saved.empresa),
     };
