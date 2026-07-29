@@ -1,6 +1,9 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { initialProposals, initialStock, type Proposal, type ProposalStatus, type StockItem } from "./mockData";
 import { ambienteLabel } from "./pricing-engine";
+import { recordChange, setRemoteApplier } from "./sync/engine";
+import { getSyncConfig } from "./sync/config";
+import type { Change } from "./sync/types";
 import {
   CATALOGO_MODELOS,
   CATALOGO_CORES,
@@ -238,12 +241,16 @@ export const store = {
     if (idx >= 0) next[idx] = p;
     else next.unshift(p);
     commit({ ...state, proposals: next });
+    recordChange("proposals", "upsert", { recordId: p.id, payload: p });
   },
   removeProposal: (id: string) => {
     commit({ ...state, proposals: state.proposals.filter((p) => p.id !== id) });
+    recordChange("proposals", "delete", { recordId: id });
   },
   setStatus: (id: string, status: ProposalStatus) => {
     commit({ ...state, proposals: state.proposals.map((p) => (p.id === id ? { ...p, status } : p)) });
+    const p = state.proposals.find((x) => x.id === id);
+    if (p) recordChange("proposals", "upsert", { recordId: id, payload: p });
   },
   duplicateProposal: (id: string) => {
     const original = state.proposals.find((p) => p.id === id);
@@ -265,6 +272,7 @@ export const store = {
       : item.codigo;
     const stockItem: StockItem = { ...item, codigo, id: uid("s") };
     commit({ ...state, stock: [stockItem, ...state.stock] });
+    recordChange("stock", "upsert", { recordId: stockItem.id, payload: stockItem });
   },
   updateStock: (id: string, patch: Partial<StockItem>) => {
     let stock = state.stock.map((s) => (s.id === id ? { ...s, ...patch } : s));
@@ -274,9 +282,12 @@ export const store = {
       stock = stock.map((s) => (s.id === id ? { ...s, codigo } : s));
     }
     commit({ ...state, stock });
+    const updated = stock.find((s) => s.id === id);
+    if (updated) recordChange("stock", "upsert", { recordId: id, payload: updated });
   },
   removeStock: (id: string) => {
     commit({ ...state, stock: state.stock.filter((s) => s.id !== id) });
+    recordChange("stock", "delete", { recordId: id });
   },
   /** Dá baixa em metros por código de material (usado ao fechar uma proposta). */
   baixarEstoque: (consumo: { codigo: number; metros: number }[]) => {
@@ -286,6 +297,10 @@ export const store = {
       return c ? { ...s, quantidade: +Math.max(0, s.quantidade - c.metros).toFixed(2) } : s;
     });
     commit({ ...state, stock });
+    // registra os itens efetivamente baixados
+    const codigos = new Set(consumo.map((c) => c.codigo));
+    stock.filter((s) => s.codigo != null && codigos.has(s.codigo))
+      .forEach((s) => recordChange("stock", "upsert", { recordId: s.id, payload: s }));
   },
 
   // ---- Clientes (mini-CRM) ----
@@ -294,23 +309,30 @@ export const store = {
     if (!nome) return;
     const idx = state.clientes.findIndex((x) => (c.id && x.id === c.id) || x.nome.trim().toLowerCase() === nome.toLowerCase());
     const clientes = [...state.clientes];
-    if (idx >= 0) clientes[idx] = { ...clientes[idx], nome, contato: c.contato ?? clientes[idx].contato, endereco: c.endereco ?? clientes[idx].endereco };
-    else clientes.push({ id: uid("c"), nome, contato: c.contato ?? "", endereco: c.endereco ?? "" });
+    let recId: string;
+    if (idx >= 0) { clientes[idx] = { ...clientes[idx], nome, contato: c.contato ?? clientes[idx].contato, endereco: c.endereco ?? clientes[idx].endereco }; recId = clientes[idx].id; }
+    else { const novo = { id: uid("c"), nome, contato: c.contato ?? "", endereco: c.endereco ?? "" }; clientes.push(novo); recId = novo.id; }
     commit({ ...state, clientes });
+    const rec = clientes.find((x) => x.id === recId);
+    if (rec) recordChange("clientes", "upsert", { recordId: recId, payload: rec });
   },
   removeCliente: (id: string) => {
     commit({ ...state, clientes: state.clientes.filter((c) => c.id !== id) });
+    recordChange("clientes", "delete", { recordId: id });
   },
 
   // ---- Modelos ----
   addModelo: (m: ModeloItem) => {
     commit({ ...state, modelos: [...state.modelos, m] });
+    recordChange("modelos", "replace", { payload: state.modelos });
   },
   updateModelo: (index: number, patch: Partial<ModeloItem>) => {
     commit({ ...state, modelos: state.modelos.map((m, i) => (i === index ? { ...m, ...patch } : m)) });
+    recordChange("modelos", "replace", { payload: state.modelos });
   },
   removeModelo: (index: number) => {
     commit({ ...state, modelos: state.modelos.filter((_, i) => i !== index) });
+    recordChange("modelos", "replace", { payload: state.modelos });
   },
 
   // ---- Cores (lista global, vale para todos os tecidos) ----
@@ -318,22 +340,27 @@ export const store = {
     const cor = nome.trim();
     if (!cor || state.cores.some((c) => c.toLowerCase() === cor.toLowerCase())) return;
     commit({ ...state, cores: [...state.cores, cor] });
+    recordChange("cores", "replace", { payload: state.cores });
   },
   removeCor: (nome: string) => {
     commit({ ...state, cores: state.cores.filter((c) => c !== nome) });
+    recordChange("cores", "replace", { payload: state.cores });
   },
 
   // ---- Variáveis ----
   updateVars: (patch: Partial<Vars>) => {
     commit({ ...state, vars: { ...state.vars, ...patch } });
+    recordChange("vars", "replace", { payload: state.vars });
   },
   resetVars: () => {
     commit({ ...state, vars: { ...DEFAULT_VARS } });
+    recordChange("vars", "replace", { payload: state.vars });
   },
 
   // ---- Empresa ----
   updateEmpresa: (patch: Partial<Empresa>) => {
     commit({ ...state, empresa: { ...state.empresa, ...patch } });
+    recordChange("empresa", "replace", { payload: state.empresa });
   },
 
   // ---- Reset (zera para os dados de exemplo) ----
@@ -344,7 +371,57 @@ export const store = {
   limparPropostas: () => {
     commit({ ...state, proposals: [] });
   },
+
+  /**
+   * Aplica mudanças vindas do servidor (outros dispositivos) ao estado local.
+   * NÃO re-registra na outbox — é só espelhar. Ignora ecos do próprio device.
+   * Chamado pelo engine de sync via setRemoteApplier.
+   */
+  applyRemoteChanges: (changes: Change[]) => {
+    const myId = getSyncConfig().deviceId;
+    let next = state;
+    for (const c of changes) {
+      if (c.deviceId && c.deviceId === myId) continue; // não reaplica o próprio
+      next = applyChange(next, c);
+    }
+    if (next !== state) commit(next);
+  },
 };
+
+/** Aplica um único evento de sync ao estado (imutável). */
+function applyChange(s: State, c: Change): State {
+  switch (c.entity) {
+    case "proposals": return applyRecord(s, "proposals", c, (p: Proposal) => p.id);
+    case "stock": return applyRecord(s, "stock", c, (x: StockItem) => x.id);
+    case "clientes": return applyRecord(s, "clientes", c, (x: Cliente) => x.id);
+    case "modelos": return c.op === "replace" ? { ...s, modelos: (c.payload as ModeloItem[]) ?? s.modelos } : s;
+    case "cores": return c.op === "replace" ? { ...s, cores: (c.payload as string[]) ?? s.cores } : s;
+    case "vars": return c.op === "replace" ? { ...s, vars: { ...DEFAULT_VARS, ...(c.payload as Partial<Vars>) } } : s;
+    case "empresa": return c.op === "replace" ? { ...s, empresa: mergeEmpresa(defaultEmpresa, c.payload as Partial<Empresa>) } : s;
+    default: return s;
+  }
+}
+
+/** upsert/delete genérico para coleções indexadas por id. */
+function applyRecord<K extends "proposals" | "stock" | "clientes">(
+  s: State, key: K, c: Change, idOf: (r: State[K][number]) => string
+): State {
+  const list = s[key] as State[K];
+  if (c.op === "delete") {
+    return { ...s, [key]: (list as any[]).filter((r) => idOf(r) !== c.recordId) } as State;
+  }
+  if (c.op === "upsert" && c.payload) {
+    const rec = c.payload as State[K][number];
+    const idx = (list as any[]).findIndex((r) => idOf(r) === c.recordId);
+    const arr = [...(list as any[])];
+    if (idx >= 0) arr[idx] = rec; else arr.unshift(rec);
+    return { ...s, [key]: arr } as State;
+  }
+  return s;
+}
+
+// Liga o espelhamento de mudanças remotas ao engine de sync.
+setRemoteApplier((changes) => store.applyRemoteChanges(changes));
 
 export type MaterialKind = "tecidos" | "forros" | "blackouts";
 

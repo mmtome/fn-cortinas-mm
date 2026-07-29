@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Calculator, FolderOpen, FileText, Package, SlidersHorizontal, LogOut, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, Calculator, FolderOpen, FileText, Package, SlidersHorizontal, LogOut, Sun, Moon, Cloud, CloudOff, RefreshCw } from "lucide-react";
 import { store } from "@/lib/store";
 import { useAuth, authStore } from "@/lib/auth";
 import { LoginScreen } from "@/components/LoginScreen";
+import { registerSW } from "@/lib/pwa";
+import { initSync, useSyncStatus } from "@/lib/sync/engine";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, short: "Início" },
@@ -18,6 +20,31 @@ function isActive(pathname: string, to: string) {
   return pathname === to || (to !== "/" && pathname.startsWith(to));
 }
 
+/** Indicador de conexão + fila de sincronização. */
+function SyncBadge({ compact = false }: { compact?: boolean }) {
+  const { online, pending, syncing } = useSyncStatus();
+  const Icon = syncing ? RefreshCw : online ? Cloud : CloudOff;
+  const cor = !online ? "text-amber-400" : pending > 0 ? "text-gold" : "text-muted-foreground";
+  const titulo = !online
+    ? `Offline — ${pending} alteração(ões) na fila, sincroniza ao reconectar`
+    : pending > 0
+      ? `${pending} alteração(ões) pendentes de sincronização`
+      : "Tudo sincronizado";
+  return (
+    <span className={`inline-flex items-center gap-1.5 ${cor}`} title={titulo} aria-label={titulo}>
+      <Icon className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+      {!compact && (
+        <span className="text-[11px] leading-none">
+          {!online ? "Offline" : pending > 0 ? `${pending} p/ enviar` : "Sincronizado"}
+        </span>
+      )}
+      {compact && pending > 0 && (
+        <span className="text-[10px] leading-none tabular-nums">{pending}</span>
+      )}
+    </span>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const [mounted, setMounted] = useState(false);
@@ -27,6 +54,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Carrega dados salvos no navegador depois da hidratação.
   useEffect(() => {
     store.hydrate();
+    registerSW();   // PWA offline
+    initSync();     // fila de sincronização (offline-first)
     const t = (localStorage.getItem("fn-cortinas:theme") === "light" ? "light" : "dark") as "dark" | "light";
     setTheme(t);
     document.documentElement.setAttribute("data-theme", t);
@@ -91,6 +120,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="px-4 py-4 border-t border-white/[0.05]">
+          <div className="px-2 pb-3">
+            <SyncBadge />
+          </div>
           <div className="flex items-center justify-between gap-2 px-2">
             <div className="min-w-0">
               <div className="text-[12px] font-medium truncate">{usuario.nome}</div>
@@ -124,6 +156,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="text-[13px] font-medium">FN Cortinas</span>
           </div>
           <div className="flex items-center gap-1">
+            <span className="px-1.5"><SyncBadge compact /></span>
             <button onClick={toggleTheme} aria-label="Alternar tema" className="p-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">
               {theme === "dark" ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
             </button>
