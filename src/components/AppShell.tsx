@@ -150,7 +150,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 min-w-0">
         {/* ===== Header mobile ===== */}
-        <header className="md:hidden sticky top-0 z-30 border-b border-white/[0.05] bg-[var(--background)]/90 backdrop-blur-md px-4 py-3 flex items-center justify-between">
+        <header
+          className="md:hidden sticky top-0 z-30 border-b border-white/[0.05] bg-[var(--background)]/90 backdrop-blur-md px-4 py-3 flex items-center justify-between"
+          style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}
+        >
           <div className="flex items-center gap-2.5">
             <img src="/logo-fn.png" alt="FN Cortinas" className="w-7 h-7 object-contain" />
             <span className="text-[13px] font-medium">FN Cortinas</span>

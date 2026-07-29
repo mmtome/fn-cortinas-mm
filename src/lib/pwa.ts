@@ -13,7 +13,7 @@ export function registerSW() {
     return;
   }
 
-  window.addEventListener("load", () => {
+  const register = () => {
     navigator.serviceWorker
       .register("/sw.js")
       .then((reg) => {
@@ -39,5 +39,10 @@ export function registerSW() {
       reloaded = true;
       window.location.reload();
     });
-  });
+  };
+
+  // IMPORTANTE: o evento "load" pode já ter disparado quando este código roda
+  // (o React monta depois). Registrar mesmo assim, senão o SW nunca instala.
+  if (document.readyState === "complete") register();
+  else window.addEventListener("load", register, { once: true });
 }
