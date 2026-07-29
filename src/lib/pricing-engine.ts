@@ -52,6 +52,7 @@ export const DEFAULT_VARS = {
   larguraUtilRolo: 2.85,   // largura útil — limite entre Caso A e Caso B
   bainhaLimite: 0.15,      // dobra mínima usável — usada só para decidir A/B
   bainha: 0.35,            // bainha cheia (cima + baixo) — usada na metragem do Caso B
+  bainhaBlackout: 0.30,    // bainha do blackout (Caso B) — FN acrescenta 30cm
   forroSeparadoFator: 1.5, // forro separado (microfibra/outro): largura × 1,5
   blackoutFator: 1.2,      // blackout: largura × 1,2
 
@@ -380,15 +381,25 @@ export function calcular(input: PricingInput, ctx: CalcCtx = {}): CalcResult {
     sobraLateral = +(nPanos * v.larguraRolo - larguraFranzida).toFixed(2);
   }
 
+  // Metragem de uma 2ª camada separada (forro separado / blackout).
+  // Segue o mesmo corte do tecido: "em pé" (Caso A) compra pela largura;
+  // "vira o rolo" (Caso B) corta panos verticais (altura + bainha da camada).
+  const metragemCamada = (fator: number, bainhaCamada: number) => {
+    const largura = L * fator;
+    if (H <= v.larguraUtilRolo) return +largura.toFixed(2);
+    const nPanosCamada = Math.max(1, Math.ceil(largura / v.larguraRolo));
+    return +(nPanosCamada * +(H + bainhaCamada).toFixed(2)).toFixed(2);
+  };
+
   // --- Forro ---
   // Costurado junto (trilho simples): acompanha o tecido.
-  // Separado (trilho duplo): largura × 1,5 (microfibra/outro).
+  // Separado (trilho duplo): largura × 1,5, virando o rolo se for alto.
   const mtsForro = temForro
-    ? estrutura.costuraXForro ? mtsTecido : +(L * v.forroSeparadoFator).toFixed(2)
+    ? estrutura.costuraXForro ? mtsTecido : metragemCamada(v.forroSeparadoFator, v.bainha)
     : 0;
 
-  // Blackout — sempre uma camada separada (trilho duplo): largura × 1,2.
-  const mtsBlackout = temBlackout ? +(L * v.blackoutFator).toFixed(2) : 0;
+  // Blackout — camada separada (trilho duplo): largura × 1,2, com bainha própria.
+  const mtsBlackout = temBlackout ? metragemCamada(v.blackoutFator, v.bainhaBlackout) : 0;
 
   // Entretela acompanha a largura franzida (zero se o próprio tecido é blackout).
   const mtsEntretela = tecido && tecido.blackout ? 0 : larguraFranzida;

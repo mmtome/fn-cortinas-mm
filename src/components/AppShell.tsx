@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Calculator, FolderOpen, FileText, Package, SlidersHorizontal, LogOut } from "lucide-react";
+import { LayoutDashboard, Calculator, FolderOpen, FileText, Package, SlidersHorizontal, LogOut, Sun, Moon } from "lucide-react";
 import { store } from "@/lib/store";
 import { useAuth, authStore } from "@/lib/auth";
 import { LoginScreen } from "@/components/LoginScreen";
@@ -21,13 +21,24 @@ function isActive(pathname: string, to: string) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const [mounted, setMounted] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const { usuario, isAdmin } = useAuth();
 
   // Carrega dados salvos no navegador depois da hidratação.
   useEffect(() => {
     store.hydrate();
+    const t = (localStorage.getItem("fn-cortinas:theme") === "light" ? "light" : "dark") as "dark" | "light";
+    setTheme(t);
+    document.documentElement.setAttribute("data-theme", t);
     setMounted(true);
   }, []);
+
+  const toggleTheme = () => {
+    const t = theme === "dark" ? "light" : "dark";
+    setTheme(t);
+    document.documentElement.setAttribute("data-theme", t);
+    try { localStorage.setItem("fn-cortinas:theme", t); } catch { /* ignora */ }
+  };
 
   // Evita flash de hidratação (server não conhece a sessão do navegador).
   if (!mounted) {
@@ -85,14 +96,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="text-[12px] font-medium truncate">{usuario.nome}</div>
               <div className="text-[10px] text-muted-foreground">{usuario.nivel}</div>
             </div>
-            <button
-              onClick={() => authStore.logout()}
-              className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors shrink-0"
-              aria-label="Sair"
-              title="Sair"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors"
+                aria-label="Alternar tema" title={theme === "dark" ? "Modo claro" : "Modo escuro"}
+              >
+                {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={() => authStore.logout()}
+                className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors"
+                aria-label="Sair" title="Sair"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -105,6 +124,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="text-[13px] font-medium">FN Cortinas</span>
           </div>
           <div className="flex items-center gap-1">
+            <button onClick={toggleTheme} aria-label="Alternar tema" className="p-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">
+              {theme === "dark" ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+            </button>
             {isAdmin && (
               <Link
                 to="/ajustes"

@@ -36,10 +36,19 @@ export const defaultEmpresa: Empresa = {
   endereco: "",
 };
 
+// -------------------- Clientes (mini-CRM) --------------------
+export interface Cliente {
+  id: string;
+  nome: string;
+  contato: string;
+  endereco: string;
+}
+
 // -------------------- Estado --------------------
 type State = {
   proposals: Proposal[];
   stock: StockItem[];       // fonte única: tecidos/forros/blackouts saem daqui
+  clientes: Cliente[];
   modelos: ModeloItem[];
   cores: string[];
   vars: Vars;
@@ -54,6 +63,7 @@ function defaultState(): State {
   return {
     proposals: initialProposals,
     stock: initialStock,
+    clientes: [],
     modelos: CATALOGO_MODELOS.map((m) => ({ ...m })),
     cores: [...CATALOGO_CORES],
     vars: { ...DEFAULT_VARS },
@@ -145,6 +155,7 @@ function hydrate() {
     state = {
       proposals: saved.proposals ? saved.proposals.map(migrateProposal) : base.proposals,
       stock: saved.stock ?? base.stock,
+      clientes: saved.clientes ?? base.clientes,
       modelos: saved.modelos ?? base.modelos,
       cores: saved.cores ?? base.cores,
       // mescla vars para não perder chaves novas em versões futuras
@@ -253,6 +264,29 @@ export const store = {
   },
   removeStock: (id: string) => {
     commit({ ...state, stock: state.stock.filter((s) => s.id !== id) });
+  },
+  /** Dá baixa em metros por código de material (usado ao fechar uma proposta). */
+  baixarEstoque: (consumo: { codigo: number; metros: number }[]) => {
+    const stock = state.stock.map((s) => {
+      if (s.codigo == null) return s;
+      const c = consumo.find((x) => x.codigo === s.codigo);
+      return c ? { ...s, quantidade: +Math.max(0, s.quantidade - c.metros).toFixed(2) } : s;
+    });
+    commit({ ...state, stock });
+  },
+
+  // ---- Clientes (mini-CRM) ----
+  upsertCliente: (c: { id?: string; nome: string; contato?: string; endereco?: string }) => {
+    const nome = c.nome.trim();
+    if (!nome) return;
+    const idx = state.clientes.findIndex((x) => (c.id && x.id === c.id) || x.nome.trim().toLowerCase() === nome.toLowerCase());
+    const clientes = [...state.clientes];
+    if (idx >= 0) clientes[idx] = { ...clientes[idx], nome, contato: c.contato ?? clientes[idx].contato, endereco: c.endereco ?? clientes[idx].endereco };
+    else clientes.push({ id: uid("c"), nome, contato: c.contato ?? "", endereco: c.endereco ?? "" });
+    commit({ ...state, clientes });
+  },
+  removeCliente: (id: string) => {
+    commit({ ...state, clientes: state.clientes.filter((c) => c.id !== id) });
   },
 
   // ---- Modelos ----

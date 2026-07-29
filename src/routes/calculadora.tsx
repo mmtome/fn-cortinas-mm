@@ -33,6 +33,8 @@ function Calculadora() {
   const cores = useStore((s) => s.cores);
   const vars = useStore((s) => s.vars);
   const proposals = useStore((s) => s.proposals);
+  const clientes = useStore((s) => s.clientes);
+  const stock = useStore((s) => s.stock);
   const ctx = useCalcCtx();
 
   const [cliente, setCliente] = useState("");
@@ -78,6 +80,13 @@ function Calculadora() {
 
   const setC = (patch: Partial<ComercialInput>) => setComercial((c) => ({ ...c, ...patch }));
 
+  // Ao digitar/selecionar um cliente já cadastrado, preenche contato e endereço.
+  const onCliente = (nome: string) => {
+    setCliente(nome);
+    const c = clientes.find((x) => x.nome.trim().toLowerCase() === nome.trim().toLowerCase());
+    if (c) { setContato(c.contato); setEndereco(c.endereco); }
+  };
+
   const salvar = () => {
     if (!cliente.trim()) { toast.error("Informe o nome do cliente"); return; }
     const numero = Math.max(1000, ...proposals.map((p) => p.numero ?? 0)) + 1;
@@ -93,6 +102,7 @@ function Calculadora() {
       data: new Date().toISOString().slice(0, 10),
       ambiente: label || "Orçamento",
     });
+    store.upsertCliente({ nome: cliente, contato, endereco });
     toast.success("Proposta salva");
     navigate({ to: "/registros" });
   };
@@ -106,8 +116,11 @@ function Calculadora() {
           {/* Cliente */}
           <div className="surface rounded-2xl p-5 sm:p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <Field label="Nome do cliente">
-                <input className={inputCls} value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Ex: Marina Albuquerque" />
+              <Field label="Nome do cliente" hint={clientes.length ? "Digite pra buscar um cliente salvo" : undefined}>
+                <input className={inputCls} list="clientes-list" value={cliente} onChange={(e) => onCliente(e.target.value)} placeholder="Ex: Marina Albuquerque" />
+                <datalist id="clientes-list">
+                  {clientes.map((c) => <option key={c.id} value={c.nome} />)}
+                </datalist>
               </Field>
               <Field label="Contato" hint="Telefone / WhatsApp">
                 <input className={inputCls} value={contato} onChange={(e) => setContato(e.target.value)} placeholder="(11) 99999-9999" />
@@ -183,6 +196,11 @@ function Calculadora() {
                       <input className={inputCls} value={amb.observacoes ?? ""} onChange={(e) => setAmbiente({ observacoes: e.target.value })} placeholder="Detalhes…" />
                     </Field>
                   </div>
+                  {amb.instalacao.instalar && amb.instalacao.dificuldade === "Difícil" && (
+                    <div className="flex items-center gap-2 text-[11px] text-gold">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Dificuldade "Difícil": instalação × {vars.fatorDificuldade ?? 1.4} (encarece todas as opções deste ambiente).
+                    </div>
+                  )}
                 </div>
                 <div className="surface-flat rounded-xl p-5 space-y-4">
                   <div className="flex items-center justify-center min-h-[140px]">
@@ -203,7 +221,7 @@ function Calculadora() {
               <div className="space-y-4">
                 {opcoes.map((o, i) => (
                   <OpcaoCard
-                    key={i} idx={i} opcao={o} calc={ambRes?.opcoes[i]}
+                    key={i} idx={i} opcao={o} calc={ambRes?.opcoes[i]} stock={stock}
                     tecidos={tecidos} forros={forros} blackouts={blackouts} modelos={modelos} cores={cores}
                     onSet={(p: Partial<EstruturaInput>) => setOpcao(i, p)}
                     onRemove={opcoes.length > 1 ? () => removeOpcao(i) : undefined}
@@ -282,10 +300,23 @@ function Calculadora() {
 // =========================================================
 // Card de uma opção (forro/blackout aparecem só quando adicionados)
 // =========================================================
-function OpcaoCard({ idx, opcao, calc, tecidos, forros, blackouts, modelos, cores, onSet, onRemove }: any) {
+function OpcaoCard({ idx, opcao, calc, stock, tecidos, forros, blackouts, modelos, cores, onSet, onRemove }: any) {
   const e: EstruturaInput = opcao.estrutura;
   const forroPadrao = forros[0]?.codigo ?? null;
   const blackoutPadrao = blackouts[0]?.codigo ?? null;
+
+  // Aviso de estoque: compara os metros da opção com o disponível no estoque.
+  const faltas: string[] = [];
+  if (calc?.result) {
+    const chk = (cod: number | null, mts: number, cat: any[]) => {
+      if (cod == null || !mts) return;
+      const item = stock?.find((s: any) => s.codigo === cod);
+      if (item && item.quantidade < mts) faltas.push(`${cat.find((t: any) => t.codigo === cod)?.nome ?? "material"} (tem ${item.quantidade}m, precisa ${mts.toFixed(1)}m)`);
+    };
+    chk(e.tecidoCodigo, calc.result.mtsTecido, tecidos);
+    chk(e.forroCodigo, calc.result.mtsForro, forros);
+    chk(e.blackoutCodigo, calc.result.mtsBlackout, blackouts);
+  }
   return (
     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-5">
       <div className="flex items-center gap-3 mb-4">
@@ -363,6 +394,13 @@ function OpcaoCard({ idx, opcao, calc, tecidos, forros, blackouts, modelos, core
               <Plus className="w-3 h-3" /> Adicionar blackout
             </button>
           )}
+        </div>
+      )}
+
+      {faltas.length > 0 && (
+        <div className="mt-3 flex items-start gap-2 text-[11px] text-[oklch(0.80_0.12_60)]">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+          <span>Estoque insuficiente: {faltas.join(" · ")}.</span>
         </div>
       )}
     </div>

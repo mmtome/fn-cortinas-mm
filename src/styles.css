@@ -200,3 +200,68 @@
     }
   }
 }
+
+/* ============================================================
+   MODO CLARO — opt-in via botão (data-theme="light" no <html>).
+   O padrão é escuro (a identidade do app). Aqui só o tema claro.
+   ============================================================ */
+:root[data-theme="light"] {
+  --background: oklch(0.965 0.008 85);
+  --foreground: oklch(0.26 0.03 262);
+  --card: oklch(0.995 0.004 85);
+  --card-foreground: oklch(0.26 0.03 262);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.26 0.03 262);
+  --secondary: oklch(0.93 0.01 85);
+  --secondary-foreground: oklch(0.26 0.03 262);
+  --muted: oklch(0.93 0.01 85);
+  --muted-foreground: oklch(0.48 0.02 262);
+  --accent: oklch(0.90 0.02 85);
+  --accent-foreground: oklch(0.32 0.06 75);
+  --border: oklch(0.26 0.03 262 / 12%);
+  --input: oklch(0.26 0.03 262 / 5%);
+  --ring: oklch(0.62 0.12 75 / 30%);
+  --sidebar: oklch(0.945 0.012 85);
+  --sidebar-foreground: oklch(0.36 0.02 262);
+  --sidebar-border: oklch(0.26 0.03 262 / 8%);
+}
+
+/* Dourado legível sobre fundo claro (o dourado de tela é claro demais no claro) */
+:root[data-theme="light"] .text-gold { color: oklch(0.55 0.12 72); }
+
+/* Superfícies e linhas */
+:root[data-theme="light"] .surface { background: oklch(1 0 0 / 0.72); border-color: oklch(0.26 0.03 262 / 0.09); }
+:root[data-theme="light"] .surface-flat { background: oklch(1 0 0); border-color: oklch(0.26 0.03 262 / 0.09); }
+:root[data-theme="light"] .hairline { background: oklch(0.26 0.03 262 / 0.08); }
+:root[data-theme="light"] .gold-hairline { background: oklch(0.55 0.12 72 / 0.3); }
+:root[data-theme="light"] .surface-hover:hover { border-color: oklch(0.55 0.12 72 / 0.3); box-shadow: 0 8px 26px -14px oklch(0.3 0.05 262 / 0.25); }
+
+/* Overlays brancos → tinta navy suave (senão somem no fundo claro) */
+:root[data-theme="light"] .bg-white\/\[0\.02\] { background-color: oklch(0.26 0.03 262 / 0.028); }
+:root[data-theme="light"] .bg-white\/\[0\.03\] { background-color: oklch(0.26 0.03 262 / 0.04); }
+:root[data-theme="light"] .bg-white\/\[0\.04\] { background-color: oklch(0.26 0.03 262 / 0.05); }
+:root[data-theme="light"] .bg-white\/\[0\.05\] { background-color: oklch(0.26 0.03 262 / 0.06); }
+:root[data-theme="light"] .bg-white\/\[0\.06\] { background-color: oklch(0.26 0.03 262 / 0.07); }
+:root[data-theme="light"] .bg-white\/\[0\.08\] { background-color: oklch(0.26 0.03 262 / 0.09); }
+:root[data-theme="light"] .bg-white\/\[0\.10\] { background-color: oklch(0.26 0.03 262 / 0.11); }
+:root[data-theme="light"] .border-white\/\[0\.03\] { border-color: oklch(0.26 0.03 262 / 0.07); }
+:root[data-theme="light"] .border-white\/\[0\.04\] { border-color: oklch(0.26 0.03 262 / 0.08); }
+:root[data-theme="light"] .border-white\/\[0\.05\] { border-color: oklch(0.26 0.03 262 / 0.10); }
+:root[data-theme="light"] .border-white\/\[0\.06\] { border-color: oklch(0.26 0.03 262 / 0.11); }
+:root[data-theme="light"] .border-white\/\[0\.08\] { border-color: oklch(0.26 0.03 262 / 0.13); }
+:root[data-theme="light"] .border-white\/\[0\.12\] { border-color: oklch(0.26 0.03 262 / 0.17); }
+:root[data-theme="light"] .border-white\/10 { border-color: oklch(0.26 0.03 262 / 0.16); }
+:root[data-theme="light"] .border-white\/20 { border-color: oklch(0.26 0.03 262 / 0.22); }
+:root[data-theme="light"] .border-white\/25 { border-color: oklch(0.26 0.03 262 / 0.26); }
+:root[data-theme="light"] .hover\:bg-white\/\[0\.015\]:hover { background-color: oklch(0.26 0.03 262 / 0.03); }
+:root[data-theme="light"] .hover\:bg-white\/\[0\.02\]:hover { background-color: oklch(0.26 0.03 262 / 0.035); }
+:root[data-theme="light"] .hover\:bg-white\/\[0\.025\]:hover { background-color: oklch(0.26 0.03 262 / 0.04); }
+:root[data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover { background-color: oklch(0.26 0.03 262 / 0.05); }
+:root[data-theme="light"] .hover\:bg-white\/\[0\.04\]:hover { background-color: oklch(0.26 0.03 262 / 0.06); }
+:root[data-theme="light"] .hover\:bg-white\/\[0\.05\]:hover { background-color: oklch(0.26 0.03 262 / 0.07); }
+:root[data-theme="light"] .hover\:border-white\/20:hover { border-color: oklch(0.26 0.03 262 / 0.28); }
+
+/* Dropdowns nativos no claro — lista de opções clara (estava navy) */
+:root[data-theme="light"] select { color-scheme: light; }
+:root[data-theme="light"] select option { background-color: oklch(0.99 0.004 85); color: oklch(0.26 0.03 262); }
+:root[data-theme="light"] input, :root[data-theme="light"] textarea { color-scheme: light; }

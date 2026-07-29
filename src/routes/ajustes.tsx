@@ -361,6 +361,7 @@ const GROUPS: { title: string; fields: VarField[] }[] = [
       { key: "larguraUtilRolo", label: "Largura útil / alt. máx. em pé", suf: "m", step: 0.05 },
       { key: "bainhaLimite", label: "Dobra mínima (Caso A)", suf: "m", step: 0.05 },
       { key: "bainha", label: "Bainha cheia (cima+baixo)", suf: "m", step: 0.05 },
+      { key: "bainhaBlackout", label: "Bainha do blackout", suf: "m", step: 0.05 },
       { key: "forroSeparadoFator", label: "Forro separado (×)", step: 0.1 },
       { key: "blackoutFator", label: "Blackout (×)", step: 0.1 },
     ],

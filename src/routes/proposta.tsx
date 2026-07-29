@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Download, Save, Building2, SlidersHorizontal, Home, Check } from "lucide-react";
+import { Download, Save, Building2, SlidersHorizontal, Home, Check, MessageCircle, PackageMinus } from "lucide-react";
 import jsPDF from "jspdf";
 
 import { PageHeader, Card, GoldButton, Modal, Field, NumberInput, selectCls, inputCls, formatDate } from "@/components/ui-kit";
@@ -40,11 +40,20 @@ function instaUrl(v: string) {
   return "https://instagram.com/" + v.replace(/^@/, "");
 }
 
+/** Só dígitos, com DDI Brasil (55) se vier sem código do país. */
+function digitsBR(v: string) {
+  let d = (v || "").replace(/\D/g, "");
+  if (!d) return "";
+  if (d.length <= 11) d = "55" + d;
+  return d;
+}
+
 function Proposta() {
   const { id } = Route.useSearch();
   const proposals = useStore((s) => s.proposals);
   const { tecidos, forros, blackouts } = useMateriais();
   const empresa = useStore((s) => s.empresa);
+  const estoque = useStore((s) => s.stock);
   const ctx = useCalcCtx();
 
   const [selectedId, setSelectedId] = useState(id || proposals[0]?.id || "");
@@ -142,7 +151,7 @@ function Proposta() {
           <PropostaOpcoes
             proposal={proposal} resultado={resultado} comercial={comercial} setC={setC}
             onSalvar={salvarAjustesOpcoes} empresa={empresa} validadeISO={validadeISO}
-            tecidos={tecidos} forros={forros} blackouts={blackouts}
+            tecidos={tecidos} forros={forros} blackouts={blackouts} estoque={estoque}
           />
         ) : proposal && res && comercial ? (
           <div className="space-y-6">
@@ -624,17 +633,52 @@ async function loadDataURL(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
-function PropostaOpcoes({ proposal, resultado, comercial, setC, onSalvar, empresa, validadeISO, tecidos, forros, blackouts }: any) {
+function PropostaOpcoes({ proposal, resultado, comercial, setC, onSalvar, empresa, validadeISO, tecidos, forros, blackouts, estoque }: any) {
   const [gerando, setGerando] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
   useEffect(() => { gerarQRWhatsApp(empresa.whatsapp).then(setQr); }, [empresa.whatsapp]);
 
+  const nomeArquivo = `Orcamento-${String(proposal.cliente).replace(/\s+/g, "-")}.pdf`;
+  const criarPDF = () => gerarPDFOpcoes({ proposal, resultado, comercial, empresa, validadeISO, tecidos, forros, blackouts, qr });
+
   const gerar = async () => {
     setGerando(true);
     try {
-      await gerarPDFOpcoes({ proposal, resultado, comercial, empresa, validadeISO, tecidos, forros, blackouts, qr });
+      const doc = await criarPDF();
+      doc.save(nomeArquivo);
       toast.success("PDF gerado");
     } catch { toast.error("Não foi possível gerar o PDF"); }
+    setGerando(false);
+  };
+
+  const mensagemWhats = () => {
+    const parcelas = resultado[0]?.parcelas ?? comercial.parcelas ?? 10;
+    const linhas = (resultado as AmbienteResult[]).map((amb) => {
+      const ops = amb.opcoes.map((o) => `• ${o.nome}: ${formatBRL(o.aVista)} à vista / ${parcelas}x ${formatBRL(o.parcelado)}`).join("\n");
+      return `*${amb.ambiente}* (${amb.medidas.larguraParede}×${amb.medidas.alturaParede}m)\n${ops}`;
+    }).join("\n\n");
+    return `Olá ${proposal.cliente}! 😊\nSegue seu orçamento${proposal.numero ? ` Nº ${proposal.numero}` : ""} da ${empresa.nome || "FN Cortinas"} — o PDF detalhado vai em anexo.\n\n${linhas}\n\nInstalação inclusa · parcelado sem juros no cartão.\nQualquer dúvida, estou à disposição! 🙌`;
+  };
+
+  const enviarWhats = async () => {
+    const num = digitsBR(proposal.contato);
+    const msg = mensagemWhats();
+    setGerando(true);
+    try {
+      const doc = await criarPDF();
+      const file = new File([doc.output("blob")], nomeArquivo, { type: "application/pdf" });
+      // Celular: compartilha o PDF de verdade (o usuário escolhe o WhatsApp).
+      if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], text: msg, title: `Orçamento · ${empresa.nome || "FN Cortinas"}` });
+      } else {
+        // Desktop: baixa o PDF e abre a conversa com o texto — anexe o arquivo.
+        doc.save(nomeArquivo);
+        if (num) window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank");
+        toast.info("PDF baixado — anexe no WhatsApp que abriu.");
+      }
+    } catch (e: any) {
+      if (e?.name !== "AbortError") toast.error("Não foi possível preparar o envio.");
+    }
     setGerando(false);
   };
 
@@ -653,15 +697,86 @@ function PropostaOpcoes({ proposal, resultado, comercial, setC, onSalvar, empres
             </Field>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <GoldButton variant="outline" onClick={onSalvar}><Save className="w-3.5 h-3.5" /> Salvar ajustes</GoldButton>
+          <GoldButton variant="outline" onClick={enviarWhats}><MessageCircle className="w-3.5 h-3.5" /> WhatsApp</GoldButton>
           <GoldButton onClick={gerar}><Download className="w-3.5 h-3.5" /> {gerando ? "Gerando…" : "Gerar PDF"}</GoldButton>
         </div>
       </div>
 
+      <BaixaEstoque key={proposal.id} resultado={resultado} estoque={estoque} />
+
       <div>
         <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground mb-3">Pré-visualização do PDF</div>
         <DocumentoPreviewOpcoes proposal={proposal} resultado={resultado} empresa={empresa} validadeISO={validadeISO} tecidos={tecidos} forros={forros} blackouts={blackouts} qr={qr} />
+      </div>
+    </div>
+  );
+}
+
+// Materiais necessários + baixa no estoque. O usuário escolhe a opção fechada
+// por ambiente; o sistema soma o tecido/forro/blackout e dá baixa.
+function BaixaEstoque({ resultado, estoque }: { resultado: AmbienteResult[]; estoque: any[] }) {
+  const [escolha, setEscolha] = useState<number[]>(resultado.map(() => 0));
+
+  const acc = new Map<number, number>();
+  resultado.forEach((amb, ai) => {
+    const op = amb.opcoes[escolha[ai] ?? 0];
+    if (!op) return;
+    const q = amb.quant || 1;
+    const add = (cod: number | null, mts: number) => { if (cod != null && mts > 0) acc.set(cod, (acc.get(cod) ?? 0) + mts * q); };
+    add(op.estrutura.tecidoCodigo, op.result.mtsTecido);
+    add(op.estrutura.forroCodigo, op.result.mtsForro);
+    add(op.estrutura.blackoutCodigo, op.result.mtsBlackout);
+  });
+  const consumo = [...acc.entries()].map(([codigo, m]) => {
+    const item = estoque.find((s) => s.codigo === codigo);
+    return { codigo, nome: item?.nome ?? `#${codigo}`, metros: +m.toFixed(2), disp: item?.quantidade ?? 0 };
+  });
+
+  const baixar = () => {
+    store.baixarEstoque(consumo.map((c) => ({ codigo: c.codigo, metros: c.metros })));
+    toast.success("Baixa registrada no estoque");
+  };
+
+  return (
+    <div className="surface rounded-2xl p-5 sm:p-6">
+      <div className="flex items-center gap-2 mb-1">
+        <PackageMinus className="w-4 h-4 text-gold" />
+        <div className="text-[13px] font-medium">Materiais &amp; baixa de estoque</div>
+      </div>
+      <div className="text-[12px] text-muted-foreground mb-4">Escolha a opção fechada em cada ambiente. O sistema soma o tecido necessário e dá baixa no estoque.</div>
+
+      <div className="space-y-2 mb-4">
+        {resultado.map((amb, ai) => (
+          <div key={ai} className="flex items-center justify-between gap-3">
+            <span className="text-[12px] truncate">{amb.ambiente}{amb.quant > 1 ? ` ×${amb.quant}` : ""}</span>
+            <select className={`${selectCls} max-w-[240px]`} value={escolha[ai] ?? 0} onChange={(e) => setEscolha((x) => x.map((v, i) => (i === ai ? +e.target.value : v)))}>
+              {amb.opcoes.map((o, oi) => <option key={oi} value={oi}>{o.nome}</option>)}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-1.5 mb-4 border-t border-white/[0.05] pt-3">
+        {consumo.map((c) => {
+          const falta = c.metros > c.disp;
+          return (
+            <div key={c.codigo} className="flex justify-between text-[12px]">
+              <span>{c.nome}</span>
+              <span className={`stat ${falta ? "text-[oklch(0.72_0.16_25)]" : "text-muted-foreground"}`}>
+                {c.metros} m {falta ? `· falta (tem ${c.disp} m)` : `· estoque ${c.disp} m`}
+              </span>
+            </div>
+          );
+        })}
+        {consumo.length === 0 && <div className="text-[12px] text-muted-foreground">Sem tecido nas opções escolhidas.</div>}
+      </div>
+
+      <div className="flex justify-end">
+        <GoldButton variant="outline" onClick={baixar} className={consumo.length ? "" : "opacity-40 pointer-events-none"}>
+          <PackageMinus className="w-3.5 h-3.5" /> Dar baixa no estoque
+        </GoldButton>
       </div>
     </div>
   );
@@ -862,5 +977,5 @@ async function gerarPDFOpcoes({ proposal, resultado, comercial, empresa, validad
     doc.text(`CNPJ ${empresa.cnpj}`, w / 2, h - M + 14, { align: "center" });
   }
 
-  doc.save(`Orcamento-${String(proposal.cliente).replace(/\s+/g, "-")}.pdf`);
+  return doc;
 }
