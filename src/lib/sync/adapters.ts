@@ -3,6 +3,8 @@
 
 import type { SyncAdapter, Change, PushResult, PullResult } from "./types";
 import { getSyncConfig } from "./config";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { SupabaseSyncAdapter } from "@/lib/supabase/sync-adapter";
 
 /**
  * Modo local (Vercel/localStorage): não há para onde sincronizar.
@@ -55,9 +57,13 @@ export function createRestAdapter(endpoint: string, token: string, deviceId: str
   };
 }
 
-/** Escolhe o adaptador a partir da config atual do dispositivo. */
+/** Escolhe o adaptador a partir da configuração atual. */
 export function getActiveAdapter(): SyncAdapter {
+  // 1) Supabase (backend recomendado) quando configurado por env.
+  if (isSupabaseConfigured()) return SupabaseSyncAdapter;
+  // 2) Backend REST genérico, se algum endpoint foi informado manualmente.
   const cfg = getSyncConfig();
   if (cfg.endpoint) return createRestAdapter(cfg.endpoint, cfg.token, cfg.deviceId);
+  // 3) Modo local (sem backend): fila fica guardada no dispositivo.
   return NullSyncAdapter;
 }

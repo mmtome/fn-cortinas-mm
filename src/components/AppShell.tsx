@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { LayoutDashboard, Calculator, FolderOpen, FileText, Package, SlidersHorizontal, LogOut, Sun, Moon, Cloud, CloudOff, RefreshCw } from "lucide-react";
 import { store } from "@/lib/store";
-import { useAuth, authStore } from "@/lib/auth";
+import { useAppAuth } from "@/lib/useAppAuth";
+import { initSupabaseAuth } from "@/lib/supabase/auth";
 import { LoginScreen } from "@/components/LoginScreen";
 import { registerSW } from "@/lib/pwa";
 import { initSync, useSyncStatus } from "@/lib/sync/engine";
@@ -49,13 +50,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const [mounted, setMounted] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const { usuario, isAdmin } = useAuth();
+  const { usuario, isAdmin, ready, semLoja, logout } = useAppAuth();
 
   // Carrega dados salvos no navegador depois da hidratação.
   useEffect(() => {
     store.hydrate();
-    registerSW();   // PWA offline
-    initSync();     // fila de sincronização (offline-first)
+    registerSW();         // PWA offline
+    initSupabaseAuth();   // sessão real (se backend configurado)
+    initSync();           // fila de sincronização (offline-first)
     const t = (localStorage.getItem("fn-cortinas:theme") === "light" ? "light" : "dark") as "dark" | "light";
     setTheme(t);
     document.documentElement.setAttribute("data-theme", t);
@@ -70,7 +72,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   // Evita flash de hidratação (server não conhece a sessão do navegador).
-  if (!mounted) {
+  // Também espera a sessão do backend (ready) antes de decidir login.
+  if (!mounted || !ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--navy-deep)]">
         <img src="/logo-fn.png" alt="" className="w-14 h-14 object-contain opacity-80 animate-pulse" />
@@ -79,6 +82,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!usuario) return <LoginScreen />;
+
+  // Logou no backend mas ainda não está vinculado a nenhuma loja (tenant).
+  if (semLoja) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--navy-deep)] px-6">
+        <div className="max-w-sm text-center">
+          <img src="/logo-fn.png" alt="" className="w-12 h-12 object-contain mx-auto mb-4 opacity-90" />
+          <h1 className="text-lg font-medium text-foreground">Conta sem loja vinculada</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Seu acesso foi criado, mas ainda não está ligado a nenhuma loja. Peça ao administrador para vincular seu usuário.
+          </p>
+          <button
+            onClick={() => logout()}
+            className="mt-6 inline-flex items-center justify-center rounded-md border border-white/[0.1] px-4 py-2 text-sm text-foreground hover:bg-white/[0.05]"
+          >
+            Sair
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const visibleNav = nav.filter((n) => !("adminOnly" in n && n.adminOnly) || isAdmin);
   const mobileNav = visibleNav.filter((n) => n.to !== "/ajustes");
@@ -137,7 +161,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
               <button
-                onClick={() => authStore.logout()}
+                onClick={() => logout()}
                 className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors"
                 aria-label="Sair" title="Sair"
               >
@@ -174,7 +198,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <SlidersHorizontal className="w-[18px] h-[18px]" />
               </Link>
             )}
-            <button onClick={() => authStore.logout()} aria-label="Sair" className="p-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">
+            <button onClick={() => logout()} aria-label="Sair" className="p-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">
               <LogOut className="w-[18px] h-[18px]" />
             </button>
           </div>

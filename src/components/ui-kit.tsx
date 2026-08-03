@@ -99,15 +99,17 @@ export function GoldButton({
   type = "button",
   variant = "primary",
   className = "",
+  disabled = false,
 }: {
   children: ReactNode;
   onClick?: () => void;
   type?: "button" | "submit";
   variant?: "primary" | "ghost" | "outline";
   className?: string;
+  disabled?: boolean;
 }) {
   const base =
-    "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-[13px] font-medium btn-press select-none";
+    "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-[13px] font-medium btn-press select-none disabled:opacity-50 disabled:pointer-events-none";
   const styles = {
     primary:
       "bg-[var(--gold)] text-[var(--navy-deep)] hover:bg-[var(--gold-soft)] hover:shadow-[0_6px_20px_-8px_oklch(0.80_0.10_88_/_0.55)]",
@@ -116,7 +118,7 @@ export function GoldButton({
       "border border-white/10 text-foreground hover:bg-white/[0.04] hover:border-white/20",
   };
   return (
-    <button type={type} onClick={onClick} className={`${base} ${styles[variant]} ${className}`}>
+    <button type={type} onClick={onClick} disabled={disabled} className={`${base} ${styles[variant]} ${className}`}>
       {children}
     </button>
   );

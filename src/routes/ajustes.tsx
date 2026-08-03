@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, Building2, SlidersHorizontal, RotateCcw, Shapes, 
 import { PageHeader, GoldButton, Modal, Field, Switch, inputCls, selectCls } from "@/components/ui-kit";
 import { useStore, store } from "@/lib/store";
 import { useAuth, authStore, type Nivel, type Usuario } from "@/lib/auth";
+import { useAppAuth } from "@/lib/useAppAuth";
 import { DEFAULT_VARS, type ModeloItem, type Vars } from "@/lib/pricing-engine";
 import { toast } from "sonner";
 
@@ -14,7 +15,8 @@ type Tab = "empresa" | "modelos" | "variaveis" | "usuarios";
 
 function Ajustes() {
   const [tab, setTab] = useState<Tab>("empresa");
-  const { isAdmin } = useAuth();
+  const { isAdmin, mode } = useAppAuth();
+  const gerirUsuariosLocal = isAdmin && mode === "local"; // no backend, gestão é via Supabase
 
   return (
     <>
@@ -28,13 +30,13 @@ function Ajustes() {
         <TabBtn active={tab === "empresa"} onClick={() => setTab("empresa")} icon={Building2}>Empresa</TabBtn>
         <TabBtn active={tab === "modelos"} onClick={() => setTab("modelos")} icon={Shapes}>Modelos e cores</TabBtn>
         <TabBtn active={tab === "variaveis"} onClick={() => setTab("variaveis")} icon={SlidersHorizontal}>Variáveis</TabBtn>
-        {isAdmin && <TabBtn active={tab === "usuarios"} onClick={() => setTab("usuarios")} icon={Users}>Usuários</TabBtn>}
+        {gerirUsuariosLocal && <TabBtn active={tab === "usuarios"} onClick={() => setTab("usuarios")} icon={Users}>Usuários</TabBtn>}
       </div>
 
       {tab === "empresa" && <EmpresaTab />}
       {tab === "modelos" && <div className="space-y-6"><ModelosTab /><CoresCard /></div>}
       {tab === "variaveis" && <VariaveisTab />}
-      {tab === "usuarios" && isAdmin && <UsuariosTab />}
+      {tab === "usuarios" && gerirUsuariosLocal && <UsuariosTab />}
     </>
   );
 }
