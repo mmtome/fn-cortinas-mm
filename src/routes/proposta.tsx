@@ -641,6 +641,14 @@ function medidasTxt(l: number, a: number) {
   return `${f(l)}m (largura) × ${f(a)}m (altura)`;
 }
 
+/** Demais serviços da FN Cortinas — vão no rodapé do orçamento. */
+const SERVICOS_FN = [
+  "Cortinas sob medida",
+  "Persianas: Rolô, Romana, Tela Solar, Blackout, Double Vision, Horizontal e Vertical",
+  "Toldos · Automação WiFi",
+  "Lavanderia: cortinas, persianas e tapetes",
+];
+
 function PropostaOpcoes({ proposal, resultado, comercial, setC, onSalvar, empresa, validadeISO, tecidos, forros, blackouts, estoque }: any) {
   const [gerando, setGerando] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
@@ -865,6 +873,33 @@ function DocumentoPreviewOpcoes({ proposal, resultado, empresa, validadeISO, tec
           <div>Pagamento: 50% de entrada + 50% na entrega. Parcelado sem juros no cartão.</div>
           <div>Prazo: 7 a 15 dias úteis após o fechamento · Garantia 12 meses.</div>
         </div>
+
+        {/* Fale conosco — botões clicáveis */}
+        {(whatsappUrl(empresa.whatsapp) || empresa.instagram) && (
+          <div className="mt-6 flex flex-wrap gap-2.5">
+            {whatsappUrl(empresa.whatsapp) && (
+              <a href={whatsappUrl(empresa.whatsapp)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--gold)] text-[var(--navy-deep)] text-[12px] font-semibold">
+                Falar no WhatsApp
+              </a>
+            )}
+            {empresa.instagram && (
+              <a href={instaUrl(empresa.instagram)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--gold)] text-[var(--gold)] text-[12px] font-semibold">
+                Instagram {instaHandle(empresa.instagram)}
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Rodapé — demais serviços da FN */}
+        <div className="mt-6 pt-4 border-t border-[var(--navy-deep)]/10">
+          <div className="text-[9px] uppercase tracking-[0.16em] text-[var(--navy-deep)]/45 mb-1.5">Também fazemos</div>
+          <div className="text-[10px] text-[var(--navy-deep)]/60 leading-relaxed">{SERVICOS_FN.join(" · ")}</div>
+          {(empresa.endereco || empresa.cnpj) && (
+            <div className="text-[10px] text-[var(--navy-deep)]/45 mt-2">
+              {[empresa.endereco, empresa.cnpj ? `CNPJ ${empresa.cnpj}` : ""].filter(Boolean).join("  ·  ")}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -980,12 +1015,43 @@ async function gerarPDFOpcoes({ proposal, resultado, comercial, empresa, validad
     `Validade do orçamento: ${formatDate(validadeISO)}.`,
   ].forEach((c) => { doc.text(`·  ${c}`, M, y); y += 13; });
 
+  // ---- Fale conosco (botões clicáveis) ----
+  ensure(120);
+  y += 10;
+  const wUrl2 = whatsappUrl(empresa.whatsapp);
+  const igUrl2 = instaUrl(empresa.instagram);
+  const btnH = 24, btnW = 168, gap = 12;
+  let bx = M;
+  if (wUrl2) {
+    doc.setFillColor(...gold); doc.roundedRect(bx, y, btnW, btnH, 5, 5, "F");
+    doc.setTextColor(...navy); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+    doc.text("Falar no WhatsApp", bx + btnW / 2, y + 15.5, { align: "center" });
+    doc.link(bx, y, btnW, btnH, { url: wUrl2 });
+    bx += btnW + gap;
+  }
+  if (igUrl2) {
+    doc.setDrawColor(...gold); doc.setLineWidth(1.2); doc.roundedRect(bx, y, btnW, btnH, 5, 5, "S");
+    doc.setTextColor(...gold); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+    doc.text(`Instagram ${instaHandle(empresa.instagram)}`, bx + btnW / 2, y + 15.5, { align: "center" });
+    doc.link(bx, y, btnW, btnH, { url: igUrl2 });
+  }
+  if (wUrl2 || igUrl2) y += btnH + 16;
+
+  // ---- Rodapé: demais serviços da FN ----
+  doc.setTextColor(...soft); doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+  doc.text("TAMBÉM FAZEMOS", M, y); y += 12;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(90, 90, 100);
+  SERVICOS_FN.forEach((s) => { doc.text(`·  ${s}`, M, y); y += 12; });
+
   // Rodapé
   doc.setTextColor(...navy); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
   doc.text(empresa.nome || "FN Cortinas", w / 2, h - M + 2, { align: "center" });
-  if (empresa.cnpj) {
-    doc.setFont("helvetica", "normal"); doc.setTextColor(...soft); doc.setFontSize(8);
-    doc.text(`CNPJ ${empresa.cnpj}`, w / 2, h - M + 14, { align: "center" });
+  {
+    const partes = [empresa.endereco, empresa.cnpj ? `CNPJ ${empresa.cnpj}` : ""].filter(Boolean).join("  ·  ");
+    if (partes) {
+      doc.setFont("helvetica", "normal"); doc.setTextColor(...soft); doc.setFontSize(8);
+      doc.text(partes, w / 2, h - M + 14, { align: "center" });
+    }
   }
 
   return doc;
