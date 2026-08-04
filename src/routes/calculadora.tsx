@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Save, AlertTriangle, Minus, Plus, Trash2, Home, Wallet, Layers } from "lucide-react";
 
-import { PageHeader, GoldButton, Field, Switch, NumberInput, inputCls, selectCls } from "@/components/ui-kit";
+import { PageHeader, GoldButton, Field, Switch, NumberInput, Modal, inputCls, selectCls } from "@/components/ui-kit";
 import {
   calcularOrcamento,
   defaultAmbiente,
@@ -43,6 +43,7 @@ function Calculadora() {
   const [ambientes, setAmbientes] = useState<AmbienteItem[]>([defaultAmbiente()]);
   const [comercial, setComercial] = useState<ComercialInput>({ ...defaultPricingInput().comercial, parcelas: 10 });
   const [active, setActive] = useState(0);
+  const [desnivelOpen, setDesnivelOpen] = useState(false);
 
   const resultado = useMemo(() => calcularOrcamento(ambientes, comercial, ctx), [ambientes, comercial, ctx]);
   const amb = ambientes[active];
@@ -52,6 +53,15 @@ function Calculadora() {
   const setAmbiente = (patch: Partial<AmbienteItem>) => setAmbientes((as) => as.map((a, i) => (i === active ? { ...a, ...patch } : a)));
   const setMedidas = (patch: Partial<AmbienteItem["medidas"]>) => setAmbiente({ medidas: { ...amb.medidas, ...patch } });
   const setInstalacao = (patch: Partial<AmbienteItem["instalacao"]>) => setAmbiente({ instalacao: { ...amb.instalacao, ...patch } });
+  const toggleDesnivel = (v: boolean) => {
+    if (v) { const a = amb.medidas.alturaParede; setAmbiente({ desnivel: { esquerda: a, centro: a, direita: a } }); setDesnivelOpen(true); }
+    else setAmbiente({ desnivel: null });
+  };
+  const setDesnivel = (patch: Partial<NonNullable<AmbienteItem["desnivel"]>>) => {
+    const a = amb.medidas.alturaParede;
+    const cur = amb.desnivel ?? { esquerda: a, centro: a, direita: a };
+    setAmbiente({ desnivel: { ...cur, ...patch } });
+  };
   const addAmbiente = () => { setAmbientes((as) => [...as, defaultAmbiente()]); setActive(ambientes.length); };
   const removeAmbiente = (i: number) => {
     if (ambientes.length <= 1) return;
@@ -70,7 +80,7 @@ function Calculadora() {
   const bk = (re: RegExp) => blackouts.find((b) => re.test(b.nome))?.codigo ?? null;
   const base = () => ({ ...defaultPricingInput().estrutura, forroCodigo: null, blackoutCodigo: null });
   const PRESETS: { nome: string; estrutura: Partial<EstruturaInput> }[] = [
-    { nome: "Só cortina", estrutura: {} },
+    { nome: "Cortina", estrutura: {} },
     { nome: "+ Forro", estrutura: { forroCodigo: forroPadrao, costuraXForro: true } },
     { nome: "+ Blackout 80%", estrutura: { blackoutCodigo: bk(/80/) } },
     { nome: "+ Blackout 100%", estrutura: { blackoutCodigo: bk(/100/) ?? bk(/black/i) } },
@@ -177,6 +187,16 @@ function Calculadora() {
                       <AlertTriangle className="w-3.5 h-3.5" /> Altura acima de 4,5m — andaime incluído.
                     </div>
                   )}
+
+                  {/* Desnível de altura — só registro/O.S., não afeta o orçamento */}
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <Switch checked={!!amb.desnivel} onChange={toggleDesnivel} label="Parede com desnível" />
+                    {amb.desnivel && (
+                      <button onClick={() => setDesnivelOpen(true)} className="text-[11px] text-gold hover:underline">
+                        E {String(amb.desnivel.esquerda).replace(".", ",")} · C {String(amb.desnivel.centro).replace(".", ",")} · D {String(amb.desnivel.direita).replace(".", ",")} m · editar
+                      </button>
+                    )}
+                  </div>
 
                   <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground pt-1">Instalação</div>
                   <div className="grid grid-cols-2 gap-3 sm:gap-4">
@@ -293,6 +313,21 @@ function Calculadora() {
           </div>
         </div>
       </div>
+
+      {/* Popup do desnível de altura (só registro/O.S.) */}
+      <Modal open={desnivelOpen} onClose={() => setDesnivelOpen(false)} title="Desnível de altura da parede">
+        <div className="text-[12px] text-muted-foreground mb-4">
+          Registre as 3 alturas para sair na Ordem de Serviço. <span className="text-foreground">Não altera o orçamento</span> — o preço continua usando a altura única.
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <NumField label="Esquerda" v={amb.desnivel?.esquerda ?? amb.medidas.alturaParede} set={(v) => setDesnivel({ esquerda: v })} suf="m" />
+          <NumField label="Centro" v={amb.desnivel?.centro ?? amb.medidas.alturaParede} set={(v) => setDesnivel({ centro: v })} suf="m" />
+          <NumField label="Direita" v={amb.desnivel?.direita ?? amb.medidas.alturaParede} set={(v) => setDesnivel({ direita: v })} suf="m" />
+        </div>
+        <div className="flex justify-end mt-5">
+          <GoldButton onClick={() => setDesnivelOpen(false)}>Concluir</GoldButton>
+        </div>
+      </Modal>
     </>
   );
 }
@@ -360,6 +395,12 @@ function OpcaoCard({ idx, opcao, calc, stock, tecidos, forros, blackouts, modelo
               <select className={selectCls} value={e.forroCodigo} onChange={(ev) => onSet({ forroCodigo: ev.target.value === "none" ? null : +ev.target.value })}>
                 {forros.map((t: any) => <option key={t.codigo} value={t.codigo}>{t.nome}</option>)}
                 <option value="none">Remover forro</option>
+              </select>
+            </Field>
+            <Field label="Cor do forro" hint="Pode ser diferente da cortina">
+              <select className={selectCls} value={e.corForro ?? ""} onChange={(ev) => onSet({ corForro: ev.target.value || undefined })}>
+                <option value="">— selecione —</option>
+                {cores.map((c: string) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
             <Field label="Forro costurado junto" hint="Trilho permanece simples">

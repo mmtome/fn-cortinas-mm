@@ -157,6 +157,7 @@ export interface EstruturaInput {
   modelo: Modelo;
   tecidoCodigo: number;
   cor?: string;            // cor do tecido (lista global, não altera o preço)
+  corForro?: string;       // cor do forro (pode ser diferente da cortina)
   forroCodigo: number | null;
   blackoutCodigo: number | null;
   costuraXForro: boolean;  // forro costurado junto
@@ -542,11 +543,19 @@ export interface OpcaoItem {
   estrutura: EstruturaInput;  // materiais dessa opção
 }
 
+/** Desnível de altura da parede — só para registro/O.S., não afeta o preço. */
+export interface Desnivel {
+  esquerda: number;
+  centro: number;
+  direita: number;
+}
+
 export interface AmbienteItem {
   ambiente: string;
   observacoes?: string;
   quant: number;              // qtd de cortinas iguais nesse ambiente
   medidas: MedidasInput;
+  desnivel?: Desnivel | null; // 3 alturas (E/C/D) — só registro/O.S.
   instalacao: InstalacaoInput;
   opcoes: OpcaoItem[];        // opções próprias deste ambiente
 }
@@ -576,12 +585,12 @@ export function defaultOpcao(nome = "Só cortina"): OpcaoItem {
 /** Nome automático da opção conforme os materiais (sempre bate com o conteúdo). */
 export function nomeOpcao(e: EstruturaInput, blackouts: Tecido[] = CATALOGO_BLACKOUTS): string {
   const parts: string[] = [];
-  if (e.forroCodigo != null) parts.push("Forro");
+  if (e.forroCodigo != null) parts.push(e.costuraXForro ? "Forro (costurado junto)" : "Forro");
   if (e.blackoutCodigo != null) {
     const bk = blackouts.find((b) => b.codigo === e.blackoutCodigo);
     parts.push(bk ? bk.nome : "Blackout");
   }
-  return parts.length ? "+ " + parts.join(" + ") : "Só cortina";
+  return parts.length ? "+ " + parts.join(" + ") : "Cortina";
 }
 
 export function defaultAmbiente(): AmbienteItem {

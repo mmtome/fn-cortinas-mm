@@ -5,19 +5,50 @@ import {
 } from "recharts";
 
 import { PageHeader, Card, StatusBadge, GoldButton, formatDate } from "@/components/ui-kit";
-import { useStore } from "@/lib/store";
-import { faturamentoMensal, stockStatus } from "@/lib/mockData";
-import { formatBRL } from "@/lib/pricing-engine";
+import { useStore, useCalcCtx } from "@/lib/store";
+import { faturamentoMensal, stockStatus, type Proposal } from "@/lib/mockData";
+import { formatBRL, calcularOrcamento, type CalcCtx } from "@/lib/pricing-engine";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
+
+/**
+ * Resumo financeiro das aprovadas. Faturamento, custos de produção e taxas de
+ * cartão são recomputados (o `valor` salvo é só um proxy). Para propostas com
+ * várias opções por ambiente usa-se a 1ª opção como referência.
+ */
+function resumoFinanceiro(aprovadas: Proposal[], ctx: CalcCtx) {
+  let faturamento = 0, custos = 0, taxas = 0;
+  for (const p of aprovadas) {
+    if (p.ambientes && p.ambientes.length) {
+      const res = calcularOrcamento(p.ambientes, p.comercial, ctx);
+      p.ambientes.forEach((a, i) => {
+        const op = res[i]?.opcoes?.[0];
+        if (!op) return;
+        const q = a.quant || 1;
+        faturamento += op.result.totalFinal * q;
+        custos += op.result.subtotalProducao * q;
+        taxas += Math.max(0, op.result.totalPagamento - op.result.totalFinal) * q;
+      });
+    } else {
+      for (const c of p.comodos) {
+        faturamento += c.result.totalFinal;
+        custos += c.result.subtotalProducao;
+        taxas += Math.max(0, c.result.totalPagamento - c.result.totalFinal);
+      }
+    }
+  }
+  return { faturamento, custos, taxas, lucro: faturamento - custos - taxas };
+}
 
 function Dashboard() {
   const proposals = useStore((s) => s.proposals);
   const stock = useStore((s) => s.stock);
+  const ctx = useCalcCtx();
 
   const aprovadas = proposals.filter((p) => p.status === "Aprovado");
   const pendentes = proposals.filter((p) => p.status === "Pendente");
-  const vendido = aprovadas.reduce((a, b) => a + b.valor, 0);
+  const fin = resumoFinanceiro(aprovadas, ctx);
+  const vendido = fin.faturamento;
   const ticket = aprovadas.length ? vendido / aprovadas.length : 0;
   const criticos = stock.filter((s) => stockStatus(s) !== "disponivel").length;
   const chartData = faturamentoMensal(proposals);
@@ -39,8 +70,9 @@ function Dashboard() {
       />
 
       {/* Indicadores essenciais */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-px bg-white/[0.04] rounded-2xl overflow-hidden mb-10">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-px bg-white/[0.04] rounded-2xl overflow-hidden mb-10">
         <Indicator label="Faturamento" value={formatBRL(vendido)} hint={`${aprovadas.length} aprovadas`} />
+        <Indicator label="Lucro operacional" value={formatBRL(fin.lucro)} hint="Faturamento − custos − taxas" accent />
         <Indicator label="Ticket médio" value={formatBRL(ticket)} hint="Por proposta fechada" />
         <Indicator label="Pendentes" value={String(pendentes.length)} hint="Aguardando decisão" />
         <Indicator label="Atenção em estoque" value={String(criticos)} hint={criticos === 0 ? "Tudo em ordem" : "Itens abaixo do mínimo"} accent={criticos > 0} />

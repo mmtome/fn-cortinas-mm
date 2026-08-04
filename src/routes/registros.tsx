@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Copy, FileDown, Search, Trash2, Phone, MapPin, Home, Check } from "lucide-react";
+import { Copy, FileDown, Search, Trash2, Phone, MapPin, Home, Check, ClipboardList } from "lucide-react";
 
 import { PageHeader, Card, StatusBadge, GoldButton, Modal, inputCls, formatDate } from "@/components/ui-kit";
-import { useStore, store } from "@/lib/store";
-import { formatBRL } from "@/lib/pricing-engine";
+import { useStore, store, useCalcCtx, useMateriais } from "@/lib/store";
+import { formatBRL, calcularOrcamento, type EstruturaInput, type CalcResult } from "@/lib/pricing-engine";
 import type { Proposal, ProposalStatus } from "@/lib/mockData";
+import { gerarOS, fmtNum, type OSRow } from "@/lib/os-pdf";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/registros")({ component: Registros });
@@ -124,6 +125,7 @@ function Registros() {
 // Card do cliente (modal) — dados + tag de status
 // =========================================================
 function ClienteCard({ proposal, onClose }: { proposal: Proposal | null; onClose: () => void }) {
+  const [osOpen, setOsOpen] = useState(false);
   if (!proposal) return null;
   const p = proposal;
 
@@ -138,6 +140,7 @@ function ClienteCard({ proposal, onClose }: { proposal: Proposal | null; onClose
   };
 
   return (
+    <>
     <Modal open={!!proposal} onClose={onClose} title={p.cliente}>
       {/* Contato / endereço */}
       <div className="space-y-2 mb-5">
@@ -180,6 +183,15 @@ function ClienteCard({ proposal, onClose }: { proposal: Proposal | null; onClose
           );
         })}
       </div>
+
+      {/* Ordem de Serviço (só p/ aprovados) */}
+      {p.status === "Aprovado" && (
+        <div className="mb-6">
+          <GoldButton className="w-full justify-center" onClick={() => setOsOpen(true)}>
+            <ClipboardList className="w-3.5 h-3.5" /> Gerar Ordem de Serviço{p.osNumero ? ` · nº ${p.osNumero}` : ""}
+          </GoldButton>
+        </div>
+      )}
 
       {/* Detalhamento */}
       {p.ambientes && p.ambientes.length ? (
@@ -234,6 +246,132 @@ function ClienteCard({ proposal, onClose }: { proposal: Proposal | null; onClose
           <Trash2 className="w-3.5 h-3.5" /> Excluir
         </GoldButton>
       </div>
+    </Modal>
+    <OSModal proposal={p} open={osOpen} onClose={() => setOsOpen(false)} />
+    </>
+  );
+}
+
+// =========================================================
+// Ordem de Serviço — escolhe a opção fechada por ambiente e gera o PDF
+// =========================================================
+interface OSGroup {
+  nome: string;
+  quant: number;
+  medidas: { larguraParede: number; alturaParede: number };
+  desnivel?: { esquerda: number; centro: number; direita: number } | null;
+  obs: string;
+  opcoes: { label: string; estrutura: EstruturaInput; result: CalcResult }[];
+}
+
+function OSModal({ proposal, open, onClose }: { proposal: Proposal; open: boolean; onClose: () => void }) {
+  const ctx = useCalcCtx();
+  const materiais = useMateriais();
+  const empresa = useStore((s) => s.empresa);
+
+  const groups: OSGroup[] = useMemo(() => {
+    if (proposal.ambientes && proposal.ambientes.length) {
+      const res = calcularOrcamento(proposal.ambientes, proposal.comercial, ctx);
+      return proposal.ambientes.map((a, i) => ({
+        nome: a.ambiente || `Ambiente ${i + 1}`,
+        quant: a.quant ?? 1,
+        medidas: a.medidas,
+        desnivel: a.desnivel ?? null,
+        obs: a.observacoes ?? "",
+        opcoes: (res[i]?.opcoes ?? []).map((o) => ({ label: o.nome, estrutura: o.estrutura, result: o.result })),
+      }));
+    }
+    return proposal.comodos.map((c) => ({
+      nome: c.ambiente,
+      quant: 1,
+      medidas: c.medidas,
+      desnivel: null,
+      obs: c.observacoes ?? "",
+      opcoes: [{ label: "Cortina", estrutura: c.estrutura, result: c.result }],
+    }));
+  }, [proposal, ctx]);
+
+  const [sel, setSel] = useState<number[]>(() => groups.map(() => 0));
+
+  const buildRow = (g: OSGroup, e: EstruturaInput, r: CalcResult): OSRow => {
+    const tecido = materiais.tecidos.find((t) => t.codigo === e.tecidoCodigo)?.nome ?? "";
+    const forroNome = e.forroCodigo != null ? materiais.forros.find((f) => f.codigo === e.forroCodigo)?.nome ?? "" : "";
+    const blackoutNome = e.blackoutCodigo != null ? materiais.blackouts.find((b) => b.codigo === e.blackoutCodigo)?.nome ?? "" : "";
+    const mtsFB = r.mtsForro || r.mtsBlackout || 0;
+    const total = (r.mtsTecido || 0) + (r.mtsForro || 0) + (r.mtsBlackout || 0);
+    return {
+      ambiente: g.nome,
+      quant: g.quant,
+      largura: fmtNum(g.medidas.larguraParede),
+      altura: fmtNum(g.medidas.alturaParede),
+      folhas: r.caso === "B" ? String(r.nPanos) : "",
+      modelo: e.modelo,
+      tecido,
+      mtsTecido: fmtNum(r.mtsTecido),
+      forro: forroNome || blackoutNome,
+      mtsForro: fmtNum(mtsFB),
+      totalM: fmtNum(total),
+      perfil: /var[aã]o/i.test(r.trilhoInferido) ? "V" : "T",
+      obs: [
+        e.cor && `Cor ${e.cor}`,
+        e.corForro && `Forro ${e.corForro}`,
+        g.desnivel && `Desnível E ${fmtNum(g.desnivel.esquerda)} · C ${fmtNum(g.desnivel.centro)} · D ${fmtNum(g.desnivel.direita)}`,
+        g.obs,
+      ].filter(Boolean).join(" · "),
+      comando: "",
+      bando: "",
+      especial: /persiana|rol[oô]/i.test(e.modelo),
+    };
+  };
+
+  const gerar = () => {
+    const numeroOS = store.gerarNumeroOS(proposal.id);
+    const rows = groups.map((g, i) => {
+      const op = g.opcoes[sel[i]] ?? g.opcoes[0];
+      return buildRow(g, op.estrutura, op.result);
+    });
+    const doc = gerarOS({ numeroOS, cliente: proposal.cliente, local: proposal.endereco, dataISO: proposal.data, rows, empresa });
+    doc.save(`OS-${numeroOS}-${(proposal.cliente || "cliente").replace(/\s+/g, "_")}.pdf`);
+    toast.success(`O.S. nº ${numeroOS} gerada`);
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={`Gerar Ordem de Serviço${proposal.osNumero ? ` · nº ${proposal.osNumero}` : ""}`}>
+      <div className="text-[12px] text-muted-foreground mb-4">
+        Confirme a opção fechada em cada ambiente. A O.S. sai com uma linha por ambiente.
+      </div>
+      <div className="space-y-3 mb-5 max-h-[50vh] overflow-y-auto pr-1">
+        {groups.map((g, i) => (
+          <div key={i} className="surface rounded-xl p-3.5">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-[13px] font-medium truncate">{g.nome}{g.quant > 1 ? ` ×${g.quant}` : ""}</span>
+              <span className="text-[11px] text-muted-foreground shrink-0">{fmtNum(g.medidas.larguraParede)} × {fmtNum(g.medidas.alturaParede)} m</span>
+            </div>
+            {g.opcoes.length > 1 ? (
+              <div className="grid gap-1.5">
+                {g.opcoes.map((o, oi) => (
+                  <button
+                    key={oi}
+                    onClick={() => setSel((s) => s.map((v, k) => (k === i ? oi : v)))}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border text-[12px] text-left transition-colors ${
+                      sel[i] === oi ? "border-[oklch(0.80_0.10_88_/_0.5)] bg-[oklch(0.80_0.10_88_/_0.07)] text-gold" : "border-white/[0.07] text-muted-foreground hover:bg-white/[0.03]"
+                    }`}
+                  >
+                    <span className={`w-3.5 h-3.5 rounded-full border shrink-0 ${sel[i] === oi ? "border-gold bg-gold" : "border-white/25"}`} />
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[12px] text-muted-foreground">{g.opcoes[0]?.label ?? "—"}</div>
+            )}
+          </div>
+        ))}
+      </div>
+      <GoldButton className="w-full justify-center" onClick={gerar}>
+        <ClipboardList className="w-3.5 h-3.5" /> Gerar O.S. (PDF)
+      </GoldButton>
     </Modal>
   );
 }

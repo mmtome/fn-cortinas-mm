@@ -56,6 +56,7 @@ type State = {
   cores: string[];
   vars: Vars;
   varsVersion: number; // versão da calibração de preços — ver VARS_VERSION
+  osSeq: number;       // último nº de O.S. atribuído (conta só orçamentos aprovados)
   empresa: Empresa;
 };
 
@@ -78,6 +79,7 @@ function defaultState(): State {
     cores: [...CATALOGO_CORES],
     vars: { ...DEFAULT_VARS },
     varsVersion: VARS_VERSION,
+    osSeq: 0,
     empresa: { ...defaultEmpresa },
   };
 }
@@ -176,6 +178,7 @@ function hydrate() {
         ? { ...base.vars, ...saved.vars }
         : { ...base.vars },
       varsVersion: VARS_VERSION,
+      osSeq: saved.osSeq ?? base.osSeq,
       // empresa: usa o valor salvo se preenchido; senão, cai no padrão (pré-preenchidos)
       empresa: mergeEmpresa(base.empresa, saved.empresa),
     };
@@ -248,9 +251,30 @@ export const store = {
     recordChange("proposals", "delete", { recordId: id });
   },
   setStatus: (id: string, status: ProposalStatus) => {
-    commit({ ...state, proposals: state.proposals.map((p) => (p.id === id ? { ...p, status } : p)) });
-    const p = state.proposals.find((x) => x.id === id);
+    // Ao aprovar pela 1ª vez, atribui o próximo nº de O.S. (conta só aprovados).
+    // O número é fixo: reprovar/reaprovar depois não o altera.
+    let osSeq = state.osSeq;
+    const proposals = state.proposals.map((p) => {
+      if (p.id !== id) return p;
+      const ganharOS = status === "Aprovado" && p.osNumero == null;
+      if (ganharOS) osSeq = osSeq + 1;
+      return { ...p, status, osNumero: ganharOS ? osSeq : p.osNumero };
+    });
+    commit({ ...state, proposals, osSeq });
+    const p = proposals.find((x) => x.id === id);
     if (p) recordChange("proposals", "upsert", { recordId: id, payload: p });
+  },
+  /** Garante um nº de O.S. para a proposta (atribui o próximo se ainda não tiver). */
+  gerarNumeroOS: (id: string): number => {
+    const atual = state.proposals.find((x) => x.id === id);
+    if (!atual) return 0;
+    if (atual.osNumero != null) return atual.osNumero;
+    const osSeq = state.osSeq + 1;
+    const proposals = state.proposals.map((x) => (x.id === id ? { ...x, osNumero: osSeq } : x));
+    commit({ ...state, proposals, osSeq });
+    const p = proposals.find((x) => x.id === id);
+    if (p) recordChange("proposals", "upsert", { recordId: id, payload: p });
+    return osSeq;
   },
   duplicateProposal: (id: string) => {
     const original = state.proposals.find((p) => p.id === id);

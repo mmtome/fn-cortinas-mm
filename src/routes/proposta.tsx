@@ -633,6 +633,14 @@ async function loadDataURL(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
+/** Valor arredondando os centavos para o real inteiro (≥0,50 sobe, senão desce). */
+function rbrl(n: number) { return formatBRL(Math.round(n)); }
+/** Medidas no formato "4,56m (largura) × 2,93m (altura)". */
+function medidasTxt(l: number, a: number) {
+  const f = (x: number) => String(x).replace(".", ",");
+  return `${f(l)}m (largura) × ${f(a)}m (altura)`;
+}
+
 function PropostaOpcoes({ proposal, resultado, comercial, setC, onSalvar, empresa, validadeISO, tecidos, forros, blackouts, estoque }: any) {
   const [gerando, setGerando] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
@@ -823,7 +831,7 @@ function DocumentoPreviewOpcoes({ proposal, resultado, empresa, validadeISO, tec
             <div key={i}>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-[13px] font-semibold">{amb.ambiente}{amb.quant > 1 ? ` · ${amb.quant}×` : ""}</div>
-                <div className="text-[10px] text-[var(--navy-deep)]/55">{amb.medidas.larguraParede} × {amb.medidas.alturaParede} m</div>
+                <div className="text-[10px] text-[var(--navy-deep)]/55">{medidasTxt(amb.medidas.larguraParede, amb.medidas.alturaParede)}</div>
               </div>
               <div className="w-8 h-[2px] bg-[var(--gold)] my-1.5" />
               <div className="overflow-x-auto">
@@ -831,8 +839,8 @@ function DocumentoPreviewOpcoes({ proposal, resultado, empresa, validadeISO, tec
                   <thead>
                     <tr className="text-[9px] uppercase tracking-wide text-[var(--navy-deep)]/50 bg-[var(--navy-deep)]/[0.04]">
                       <th className="text-left font-medium py-1.5 px-2">Opção</th>
+                      <th className="text-right font-medium py-1.5 px-2">{parcelas}x sem juros</th>
                       <th className="text-right font-medium py-1.5 px-2">À vista</th>
-                      <th className="text-right font-medium py-1.5 px-2">{parcelas}x</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -842,8 +850,8 @@ function DocumentoPreviewOpcoes({ proposal, resultado, empresa, validadeISO, tec
                           <div className="font-medium">{op.nome}</div>
                           <div className="text-[9px] text-[var(--navy-deep)]/50">{descreverOpcao(op.estrutura, tecidos, forros, blackouts)}</div>
                         </td>
-                        <td className="text-right px-2 stat align-top pt-1.5">{formatBRL(op.aVista)}</td>
-                        <td className="text-right px-2 stat text-[var(--navy-deep)]/60 align-top pt-1.5">{formatBRL(op.parcelado)}</td>
+                        <td className="text-right px-2 stat font-semibold align-top pt-1.5">{rbrl(op.parcelado)}</td>
+                        <td className="text-right px-2 stat text-[var(--navy-deep)]/55 align-top pt-1.5">{rbrl(op.aVista)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -927,26 +935,29 @@ async function gerarPDFOpcoes({ proposal, resultado, comercial, empresa, validad
     doc.setTextColor(...ink); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
     doc.text(amb.ambiente + (amb.quant > 1 ? `  ·  ${amb.quant}×` : ""), M, y);
     doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...soft);
-    doc.text(`${amb.medidas.larguraParede} × ${amb.medidas.alturaParede} m`, w - M, y, { align: "right" });
+    doc.text(medidasTxt(amb.medidas.larguraParede, amb.medidas.alturaParede), w - M, y, { align: "right" });
     doc.setDrawColor(...gold); doc.setLineWidth(1); doc.line(M, y + 5, M + 40, y + 5);
     y += 16;
 
-    // Cabeçalho da tabela de opções
+    // Cabeçalho da tabela de opções — 10x sem juros em destaque, à vista secundário
     doc.setFillColor(...head); doc.rect(M - 6, y - 9, w - 2 * M + 12, 18, "F");
     doc.setTextColor(...soft); doc.setFont("helvetica", "bold"); doc.setFontSize(7.5);
     doc.text("OPÇÃO", M, y + 3.5);
     doc.text("À VISTA", xV, y + 3.5, { align: "right" });
-    doc.text(`${parcelas}X`, xP, y + 3.5, { align: "right" });
+    doc.text(`${parcelas}X SEM JUROS`, xP, y + 3.5, { align: "right" });
     y += 20;
 
     amb.opcoes.forEach((op) => {
       ensure(28);
       doc.setTextColor(...ink); doc.setFont("helvetica", "bold"); doc.setFontSize(9.5);
       doc.text(op.nome, M, y);
+      // à vista: secundário (cinza, normal)
+      doc.setFont("helvetica", "normal"); doc.setTextColor(...soft);
+      doc.text(rbrl(op.aVista), xV, y, { align: "right" });
+      // 10x sem juros: destaque (escuro, negrito)
+      doc.setFont("helvetica", "bold"); doc.setTextColor(...ink);
+      doc.text(rbrl(op.parcelado), xP, y, { align: "right" });
       doc.setFont("helvetica", "normal");
-      doc.text(formatBRL(op.aVista), xV, y, { align: "right" });
-      doc.setTextColor(...soft);
-      doc.text(formatBRL(op.parcelado), xP, y, { align: "right" });
       y += 11;
       doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...soft);
       doc.text(descreverOpcao(op.estrutura, tecidos, forros, blackouts).slice(0, 80), M, y);

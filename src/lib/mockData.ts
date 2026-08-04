@@ -20,6 +20,7 @@ export interface ComodoData extends ComodoInput {
 export interface Proposal {
   id: string;
   numero?: number;            // nº sequencial do orçamento (novo formato)
+  osNumero?: number;          // nº da Ordem de Serviço (só ao aprovar; conta só aprovados)
   cliente: string;
   endereco: string;           // endereço do cliente
   contato: string;            // telefone/contato do cliente
