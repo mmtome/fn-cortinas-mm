@@ -299,28 +299,25 @@ function OSModal({ proposal, open, onClose }: { proposal: Proposal; open: boolea
     const blackoutNome = e.blackoutCodigo != null ? materiais.blackouts.find((b) => b.codigo === e.blackoutCodigo)?.nome ?? "" : "";
     const mtsFB = r.mtsForro || r.mtsBlackout || 0;
     const total = (r.mtsTecido || 0) + (r.mtsForro || 0) + (r.mtsBlackout || 0);
+    const forroLabel = forroNome ? `${forroNome}${e.corForro ? " " + e.corForro : ""}` : blackoutNome;
+    const forroModelo = forroNome ? (e.costuraXForro ? "costurado junto" : "separado") : (blackoutNome ? "separado" : "");
     return {
-      ambiente: g.nome,
       quant: g.quant,
       largura: fmtNum(g.medidas.larguraParede),
       altura: fmtNum(g.medidas.alturaParede),
-      folhas: r.caso === "B" ? String(r.nPanos) : "",
-      modelo: e.modelo,
-      tecido,
-      mtsTecido: fmtNum(r.mtsTecido),
-      forro: forroNome || blackoutNome,
-      mtsForro: fmtNum(mtsFB),
-      totalM: fmtNum(total),
       perfil: /var[aã]o/i.test(r.trilhoInferido) ? "V" : "T",
+      frente: `${tecido}${e.cor ? " " + e.cor : ""}`.trim(),
+      modelo: e.modelo,
+      metrosFrente: fmtNum(r.mtsTecido),
+      forro: forroLabel,
+      forroModelo,
+      metrosForro: fmtNum(mtsFB),
+      totalMetros: fmtNum(total),
       obs: [
-        e.cor && `Cor ${e.cor}`,
-        e.corForro && `Forro ${e.corForro}`,
+        g.nome,
         g.desnivel && `Desnível E ${fmtNum(g.desnivel.esquerda)} · C ${fmtNum(g.desnivel.centro)} · D ${fmtNum(g.desnivel.direita)}`,
         g.obs,
       ].filter(Boolean).join(" · "),
-      comando: "",
-      bando: "",
-      especial: /persiana|rol[oô]/i.test(e.modelo),
     };
   };
 
@@ -330,7 +327,7 @@ function OSModal({ proposal, open, onClose }: { proposal: Proposal; open: boolea
       const op = g.opcoes[sel[i]] ?? g.opcoes[0];
       return buildRow(g, op.estrutura, op.result);
     });
-    const doc = gerarOS({ numeroOS, cliente: proposal.cliente, local: proposal.endereco, dataISO: proposal.data, rows, empresa });
+    const doc = gerarOS({ numeroOS, cliente: proposal.cliente, dataISO: proposal.data, rows, empresa });
     doc.save(`OS-${numeroOS}-${(proposal.cliente || "cliente").replace(/\s+/g, "_")}.pdf`);
     toast.success(`O.S. nº ${numeroOS} gerada`);
     onClose();
