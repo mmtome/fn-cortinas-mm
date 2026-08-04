@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Calculator, FolderOpen, FileText, Package, SlidersHorizontal, LogOut, Sun, Moon, Cloud, CloudOff, RefreshCw } from "lucide-react";
+import { LayoutDashboard, Calculator, FolderOpen, FileText, Package, SlidersHorizontal, LogOut, Sun, Moon, Cloud, CloudOff, RefreshCw, Contact } from "lucide-react";
 import { store } from "@/lib/store";
 import { useAppAuth } from "@/lib/useAppAuth";
 import { initSupabaseAuth } from "@/lib/supabase/auth";
@@ -12,6 +12,7 @@ const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, short: "Início" },
   { to: "/calculadora", label: "Calculadora", icon: Calculator, short: "Calcular" },
   { to: "/registros", label: "Registros", icon: FolderOpen, short: "Registros" },
+  { to: "/clientes", label: "Clientes", icon: Contact, short: "Clientes" },
   { to: "/proposta", label: "Propostas", icon: FileText, short: "Propostas" },
   { to: "/estoque", label: "Estoque", icon: Package, short: "Estoque" },
   { to: "/ajustes", label: "Ajustes", icon: SlidersHorizontal, short: "Ajustes", adminOnly: true },

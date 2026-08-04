@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegistrosRouteImport } from './routes/registros'
 import { Route as PropostaRouteImport } from './routes/proposta'
 import { Route as EstoqueRouteImport } from './routes/estoque'
+import { Route as ClientesRouteImport } from './routes/clientes'
 import { Route as CalculadoraRouteImport } from './routes/calculadora'
 import { Route as AjustesRouteImport } from './routes/ajustes'
 import { Route as IndexRouteImport } from './routes/index'
@@ -29,6 +30,11 @@ const PropostaRoute = PropostaRouteImport.update({
 const EstoqueRoute = EstoqueRouteImport.update({
   id: '/estoque',
   path: '/estoque',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientesRoute = ClientesRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CalculadoraRoute = CalculadoraRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ajustes': typeof AjustesRoute
   '/calculadora': typeof CalculadoraRoute
+  '/clientes': typeof ClientesRoute
   '/estoque': typeof EstoqueRoute
   '/proposta': typeof PropostaRoute
   '/registros': typeof RegistrosRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ajustes': typeof AjustesRoute
   '/calculadora': typeof CalculadoraRoute
+  '/clientes': typeof ClientesRoute
   '/estoque': typeof EstoqueRoute
   '/proposta': typeof PropostaRoute
   '/registros': typeof RegistrosRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/ajustes': typeof AjustesRoute
   '/calculadora': typeof CalculadoraRoute
+  '/clientes': typeof ClientesRoute
   '/estoque': typeof EstoqueRoute
   '/proposta': typeof PropostaRoute
   '/registros': typeof RegistrosRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/ajustes'
     | '/calculadora'
+    | '/clientes'
     | '/estoque'
     | '/proposta'
     | '/registros'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/ajustes'
     | '/calculadora'
+    | '/clientes'
     | '/estoque'
     | '/proposta'
     | '/registros'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/ajustes'
     | '/calculadora'
+    | '/clientes'
     | '/estoque'
     | '/proposta'
     | '/registros'
@@ -103,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AjustesRoute: typeof AjustesRoute
   CalculadoraRoute: typeof CalculadoraRoute
+  ClientesRoute: typeof ClientesRoute
   EstoqueRoute: typeof EstoqueRoute
   PropostaRoute: typeof PropostaRoute
   RegistrosRoute: typeof RegistrosRoute
@@ -129,6 +142,13 @@ declare module '@tanstack/react-router' {
       path: '/estoque'
       fullPath: '/estoque'
       preLoaderRoute: typeof EstoqueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clientes': {
+      id: '/clientes'
+      path: '/clientes'
+      fullPath: '/clientes'
+      preLoaderRoute: typeof ClientesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/calculadora': {
@@ -159,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AjustesRoute: AjustesRoute,
   CalculadoraRoute: CalculadoraRoute,
+  ClientesRoute: ClientesRoute,
   EstoqueRoute: EstoqueRoute,
   PropostaRoute: PropostaRoute,
   RegistrosRoute: RegistrosRoute,

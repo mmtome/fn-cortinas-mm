@@ -7,7 +7,16 @@ import { useStore, store, useCalcCtx, useMateriais } from "@/lib/store";
 import { formatBRL, calcularOrcamento, type EstruturaInput, type CalcResult } from "@/lib/pricing-engine";
 import type { Proposal, ProposalStatus } from "@/lib/mockData";
 import { gerarOS, fmtNum, type OSRow } from "@/lib/os-pdf";
+import { montarItensServico, gerarOrcamentoServico, type TipoServico } from "@/lib/orcamento-servico-pdf";
 import { toast } from "sonner";
+
+/** Baixa o PDF de orçamento de persiana/lavanderia a partir dos dados da proposta. */
+function baixarServico(p: Proposal, tipo: TipoServico, tecidos: any[], empresa: any) {
+  const itens = montarItensServico(p, tecidos);
+  const doc = gerarOrcamentoServico({ tipo, cliente: p.cliente, endereco: p.endereco, contato: p.contato, dataISO: p.data, numero: p.numero, itens, empresa });
+  doc.save(`Orcamento-${tipo}-${(p.cliente || "cliente").replace(/\s+/g, "_")}.pdf`);
+  toast.success(`Orçamento de ${tipo} gerado`);
+}
 
 export const Route = createFileRoute("/registros")({ component: Registros });
 
@@ -126,6 +135,8 @@ function Registros() {
 // =========================================================
 function ClienteCard({ proposal, onClose }: { proposal: Proposal | null; onClose: () => void }) {
   const [osOpen, setOsOpen] = useState(false);
+  const materiais = useMateriais();
+  const empresa = useStore((s) => s.empresa);
   if (!proposal) return null;
   const p = proposal;
 
@@ -182,6 +193,20 @@ function ClienteCard({ proposal, onClose }: { proposal: Proposal | null; onClose
             </button>
           );
         })}
+      </div>
+
+      {/* Baixar orçamentos (3 tipos) */}
+      <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-2">Baixar orçamento</div>
+      <div className="grid grid-cols-3 gap-2 mb-6">
+        <Link to="/proposta" search={{ id: p.id } as any} onClick={onClose} className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-white/[0.08] text-[12px] hover:bg-white/[0.03] transition-colors">
+          <FileDown className="w-3.5 h-3.5" /> Cortina
+        </Link>
+        <button onClick={() => baixarServico(p, "Persiana", materiais.tecidos, empresa)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-white/[0.08] text-[12px] hover:bg-white/[0.03] transition-colors">
+          <FileDown className="w-3.5 h-3.5" /> Persiana
+        </button>
+        <button onClick={() => baixarServico(p, "Lavanderia", materiais.tecidos, empresa)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-white/[0.08] text-[12px] hover:bg-white/[0.03] transition-colors">
+          <FileDown className="w-3.5 h-3.5" /> Lavanderia
+        </button>
       </div>
 
       {/* Ordem de Serviço (só p/ aprovados) */}
